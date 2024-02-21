@@ -1,0 +1,381 @@
+ObjC.import("Foundation")
+ObjC.import("stdlib")
+ObjC.import("IOBluetooth")
+
+const LOG_LEVEL_VAR_NAME = "log_level"
+
+let log = null
+
+class SimpleLogger { 
+    logLevel = null
+
+    constructor(logLevel = "debug") {
+        this.logLevel = logLevel
+    }
+
+    error(msg) {
+        // errors are always goes to stdout
+        console.log(`[ERROR]: ${msg}`)
+    }
+
+    info(msg) {
+        if (this.logLevel === "info" || this.logLevel === "debug") {
+            console.log(`[INFO]: ${msg}`)
+        }
+    }
+
+    debug(msg) {
+        if (this.logLevel === "debug") {
+            console.log(`[DEBUG]: ${msg}`)
+        }
+    }
+}
+
+class BtManager {
+    constructor() {
+        this.controller = null
+    }
+
+    getPairedDevicesObjs() {
+        let raw_devices = $.IOBluetoothDevice.pairedDevices
+        return Array.from(ObjC.unwrap(raw_devices), device => device)
+
+    }
+
+    getPairedDevices() {
+        let items = this.getPairedDevicesObjs()
+
+        return Array.from(items, device => {
+            let name = ObjC.unwrap(device.nameOrAddress)
+            let connected = ObjC.unwrap(device.isConnected)
+            return {
+                "name": ObjC.unwrap(device.nameOrAddress),
+                "connected": ObjC.unwrap(device.isConnected),
+                "address": ObjC.unwrap(device.addressString),
+                "instance": device
+            }
+        })
+    }
+
+    getDeviceByName(deviceName) {
+        let devices = this.getPairedDevices()
+		for (let device of devices) { 
+			if (device.name === deviceName) {
+				return device
+			}
+		}
+        return null
+    }
+
+    _getHostController() {
+        if (this.controller === null) {
+            this.controller = $.IOBluetoothHostController.alloc.init
+        }
+        return this.controller
+    }
+
+    isBluetoothOn() {
+        return this._getHostController().powerState === 0 ? false : true
+    }
+
+    turnOffBluetooth() {
+        this._getHostController().powerState = 0
+    }
+
+    turnOnBluetooth() {
+        this._getHostController().powerState = 1
+    }
+
+}
+
+class WorkflowError extends Error {
+	constructor(title, subtitle, ...params) {
+		super(...params)
+
+		this.name = "WorkflowError"
+		this.title = title
+		this.subtitle = subtitle
+	}
+}
+
+class WorkflowBase {
+	constructor(currentApp=null) {
+		if (currentApp === null || currentApp === undefined) {
+			this.currentApp = Application.currentApplication()
+			this.currentApp.includeStandardAdditions = true
+		}
+
+		let args = $.NSProcessInfo.processInfo.arguments
+        if (args.count < 5) {
+            log.error("Invalid number of arguments specified")
+            return null
+        }
+        this.args = ObjC.deepUnwrap(args).slice(4)
+	}
+
+	getEnvVar(name) {
+		let variable = ObjC.unwrap(
+            $.NSProcessInfo.processInfo.environment.objectForKey(name))
+        return variable === undefined ? null : variable
+	}
+
+	setEnvVar(name, value) {
+        let bundleid = this.getEnvVar("alfred_workflow_bundleid")
+        if (!bundleid) {
+            log.error("\"aflred_workflow_bundleid\" is not set")
+            throw new Error(
+                "could not read from \"alfred_workflow_bundleid\" env variable. Check that bundleid for workflow is set")
+        }
+
+        Application("com.runningwithcrayons.Alfred").setConfiguration(name, {
+            toValue: value,
+            inWorkflow: bundleid,
+            exportable: true,
+        })
+
+        return true
+	}
+
+	returnErr(title, subtitle) {
+        title = title || "Error executing workflow"
+        subtitle = subtitle || "Check workflow debug window for details"
+
+        return JSON.stringify({
+            "items": [
+                {
+                    "uid": "jl-error",
+                    "title": title,
+                    "subtitle": subtitle,
+                    "valid": false,
+                }
+            ]
+        })
+	}
+
+	returnResult(data) {
+        return JSON.stringify({
+            "items": data
+        })
+	}
+}
+
+// holds IOBluetoothHostController instance
+// let controller = null
+// holds current currentApplication() instance
+// let app = null
+
+// Returns current app instance
+// let getApp = () => {
+// 	if (app === null) {
+// 		app = Application.currentApplication()
+// 		app.includeStandardAdditions = true
+// 	}
+// 	return app
+// }
+
+// shortcut to return error for alfred
+// let returnErr = (title, subtitle) => {
+// 	return JSON.stringify({
+// 		"items": [
+// 			{
+// 				"uid": "error",
+// 				"title": title,
+// 				"subtitle": subtitle,
+// 			}
+// 		]
+// 	})
+// }
+
+class ListBtDevicesCommand extends WorkflowBase {
+    run() {
+        log.debug("running list bluetooth devices command")
+        let mgr = new BtManager()
+        
+        let items = mgr.getPairedDevices()
+        log.debug(`got '${items.length}' paired bluetooth devices`)
+        if (items.length === 0) {
+            log.debug("no paired devices found")
+            return this.returnErr(
+                "No paired devices found", 
+                "You might want to pair device before using this workflow"
+            )
+        }
+
+        let query = this.args.at(1)
+
+        if (query !== null && query !== undefined) {
+            log.debug(`filtering devices by query '${query}'`)
+            items = items.filter(device => {
+                return device.name.toLowerCase().includes(query.toLowerCase())
+            })
+
+            if (items.length === 0) {
+                log.debug(`No devices matching query '${query}' found`)
+                return this.returnErr(
+                    "No matching devices", 
+                    `No devices matching query "${query}`
+                )
+            }
+        }
+        
+        let results = []
+        items.forEach(device => {
+            results.push({
+                "uid": device.name,
+                "title": device.name,
+                "subtitle": device.address,
+                "icon": {
+                    "path": device.connected ? "./assets/on.png" : "./assets/off.png"
+                },
+                "arg": device.name,
+                })
+        })
+        return this.returnResult(results)
+    }
+}
+
+class ToggleConnectionCommand extends WorkflowBase {
+    run() {
+        log.debug("running toggle command")
+        let mgr = new BtManager()
+
+        let deviceName = this.args.at(1)
+        if (deviceName === undefined) {
+            log.error("missing required parameter \"deviceName\"")
+            return this.returnErr(
+                "Error running toggle",
+                "Invalid number of arguments specified"
+            )
+        }
+
+        let device = mgr.getDeviceByName(deviceName)
+        if (device === null) {
+            log.error(`Could not find device with name "${deviceName}"`)
+            return this.returnErr(
+                "Could not find device",
+                `Unable to find device "${deviceName}"`
+            )
+        }
+
+        log.debug(`Got device: ${JSON.stringify(device)}`)
+
+        // waits for connection
+        let _waitForConnection = () => {
+            for (let i=0; i < 3; i++) {
+                if (ObjC.unwrap(device.isConnected)) {
+                    return true
+                }
+                delay(0.5)
+            }
+            return false
+        }
+
+
+        if (device.connected) {
+            log.debug("Device is connected, attemping to disconnect it")
+            device.instance.closeConnection
+            this.currentApp.displayNotification(`Successfully disconnected from ${deviceName}`, 
+                {withTitle: "Blueman", subtitle: "Disconnected"}
+            )
+        } else {
+            log.debug("Device is disconnected, attemping to connect to it")
+            device.instance.openConnection
+            if (_waitForConnection()) {
+                log.debug(`Successfully connected to "${deviceName}"`)
+                this.currentApp.displayNotification(`Successfully connected to ${deviceName}`, 
+                    {withTitle: "Blueman", subtitle: "Connected"}
+                )
+            } else {
+                log.debug(`Could not connect to device "${deviceName}"`)
+                this.currentApp.displayNotification(`Could not connect to device ${deviceName}`, 
+                    {withTitle: "Blueman", subtitle: "Error connecting"}
+                )
+            }
+        }
+
+        return
+    }
+}
+
+class TurnBtOffCommand extends WorkflowBase {
+    run() {
+        log.debug("running command to turn bluetooth OFF")
+        let mgr = new BtManager()
+
+        if (!mgr.isBluetoothOn()) {
+            log.debug("bluetooth already turned off, exiting")
+            this.currentApp.displayNotification("Bluetooth already turned off",
+                {withTitle: "Blueman", subtitle: "Error"}
+            )
+            return
+        }
+
+        mgr.turnOffBluetooth()
+        let msg = "Command to turn bluetooth OFF was successfully sent"
+        log.debug(msg)
+        this.currentApp.displayNotification(msg, {withTitle: "Blueman", subtitle: "Success"})
+    }
+}
+
+class TurnBtOnCommand extends WorkflowBase {
+    run() {
+        log.debug("running command to turn bluetooth ON")
+        let mgr = new BtManager()
+
+        if (mgr.isBluetoothOn()) {
+            log.debug("bluetooth already turned on, exiting")
+            this.currentApp.displayNotification("Bluetooth already turned on",
+                {withTitle: "Blueman", subtitle: "Error"}
+            )
+            return
+        }
+
+        mgr.turnOnBluetooth()
+        let msg = "Command to turn bluetooth ON was successfully sent"
+        log.debug(msg)
+        this.currentApp.displayNotification(msg, {withTitle: "Blueman", subtitle: "Success"})
+    }
+}
+
+const possibleCommands = {
+    "list": ListBtDevicesCommand,
+    "toggle": ToggleConnectionCommand,
+    "turn-on": TurnBtOnCommand,
+    "turn-off": TurnBtOffCommand
+}
+
+function run() {
+    // Small code duplication is better than excess complexity
+    let logLevel = ObjC.unwrap(
+        $.NSProcessInfo.processInfo.environment.objectForKey(LOG_LEVEL_VAR_NAME))
+    if (logLevel === undefined || logLevel === null) {
+        logLevel = "error"
+    } 
+
+    // Don't want to overcompliate this and pass down thru all dependencies.
+    // To make this easier logging is a simple global variable initialized here
+    // and accessible in whole script
+    log = new SimpleLogger(logLevel)
+
+    let rawArgs = $.NSProcessInfo.processInfo.arguments
+    if (rawArgs.count < 5) {
+        log.error(`invalid usage. This script should be called within alfred workflow only`)
+        return
+    }
+    let args = ObjC.deepUnwrap(rawArgs).slice(4)
+
+    if (args.count < 3) {
+        log.error("Invalid number of arguments passed")
+    }
+
+    let command = args.at(0)
+    let possibleCommandNames = Object.keys(possibleCommands).join(", ")
+    if (!(command in possibleCommands)) {
+        log.error(
+            `invalid command "${command}". Possible commands are: [${possibleCommandNames}]`)
+        return log.error("Invalid command specified")
+    }
+
+    let runner = new possibleCommands[command]()
+    return runner.run()
+}

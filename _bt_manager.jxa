@@ -1,0 +1,266 @@
+ObjC.import("Foundation")
+ObjC.import("stdlib")
+ObjC.import("IOBluetooth")
+
+// holds IOBluetoothHostController instance
+let controller = null
+// holds current currentApplication() instance
+let app = null
+
+// Returns current app instance
+let getApp = () => {
+	if (app === null) {
+		app = Application.currentApplication()
+		app.includeStandardAdditions = true
+	}
+	return app
+}
+
+// shortcut to return error for alfred
+let returnErr = (title, subtitle) => {
+	return JSON.stringify({
+		"items": [
+			{
+				"uid": "error",
+				"title": title,
+				"subtitle": subtitle,
+			}
+		]
+	})
+}
+
+// returns instance of IOBluetoothHostController.
+// Used to check current bluetooth status (on or off) and turn it off or on
+let getHostController = () => {
+	if (controller === null) {
+		controller = $.IOBluetoothHostController.alloc.init
+	}
+	return controller
+}
+
+// shortcut to check whether bluetooth is turned on
+let isBluetoothOn = () => {
+	return getHostController().powerState === 0 ? false : true
+}
+
+// shortcut for returning environment variable
+let getEnvVar = (name) => {
+	let variable = ObjC.unwrap(
+		$.NSProcessInfo.processInfo.environment.objectForKey(name))
+	return variable === undefined ? null : variable
+}
+
+// returns devices list (raw objects that should be unwrapped)
+let getDevices = () => {
+	raw_devices = $.IOBluetoothDevice.pairedDevices
+	return items = Array.from(ObjC.unwrap(raw_devices), device => device)
+}
+
+// returns current args passed to script
+let getArgs = () => {
+	let args = $.NSProcessInfo.processInfo.arguments 
+	if (args.count === 0) {
+		return returnErr(
+			"Error calling script",
+			"Invalid number of arguments",
+		)
+	}
+
+	return ObjC.deepUnwrap(args).slice(4)
+}
+
+// Action called from script which returns list of paired bluetooth devices
+let getPairedDevicesAction = () => {
+	let args = getArgs()
+
+	// Device name or its part for filtering
+	deviceName = args.at(1)
+
+	let items = Array.from(getDevices(), device => {
+		name = ObjC.unwrap(device.nameOrAddress)
+		connected = ObjC.unwrap(device.isConnected)
+		return {
+			"uid": name,
+			"title": name,
+			"subtitle": `(${ObjC.unwrap(device.addressString)})`,
+			"icon": {
+				"path": connected ? "./assets/on.png" : "./assets/off.png"
+			},
+			"arg": name,
+		}
+	})
+
+	items = items.filter(device => {
+		return device.title.toLowerCase().includes(deviceName.toLowerCase())
+	})
+
+	if (items.length > 0) {
+		return JSON.stringify({
+			"items": items 
+		})
+	} else {
+		return returnErr(
+			"No matching devices", 
+			`No devices matching query "${deviceName}`
+		)
+	}
+}
+
+// Action called from alfred for turning on bluetooth adapter
+// it waits 5 seconds and shows error after. If during this 5 seconds
+// bluetooth becomes active it will show paired devices list
+let turnOnBluetoothAction = () => {
+	let attempt = getEnvVar("attempt")
+	attempt = attempt === null ? 0 : parseInt(attempt)
+
+	if (attempt === 0) {
+		getHostController().powerState = 1
+	}
+
+	if (attempt >= 5 && !isBluetoothOn()) {
+		return returnErr(
+			"Error turning on bluetooth",
+			"Try turning on it manually"
+		)
+	}
+
+	if (isBluetoothOn()) {
+		return getPairedDevicesAction()
+	}
+
+	return JSON.stringify({
+		"rerun": 1,
+		"variables": {"attempt": attempt + 1},
+		"items": [
+			{
+				"uid": "loading",
+				"title": "Loading for Bluetooth to turn on",
+				"subtitle": "Closing dialog will NOT cancel operation",
+			}
+		]
+	})
+}
+
+// Action called from alfred to toggle connection to device
+let toggleConnectionAction = () => {
+	let args = getArgs()
+	if (args.at(1) === undefined) {
+		return returnErr(
+			"Error running toggle",
+			"Invalid number of arguments specified"
+		)
+	}
+
+	// For toggle action expected one argument which is device name
+	deviceName = args.at(1)
+
+	// returns current device object instance by deviceName
+	let _getDevice = () => {
+		for (let dev of getDevices()) { 
+			if (ObjC.unwrap(dev.nameOrAddress) === deviceName) {
+				return dev
+			}
+		}
+		return null
+	}
+
+	// waits for connection
+	let _waitForConnection = () => {
+		for (let i=0; i < 3; i++) {
+			if (ObjC.unwrap(device.isConnected)) {
+				return true
+			}
+			delay(0.5)
+		}
+		return false
+	}
+
+	let device = _getDevice()
+
+	if (device === null) {
+		return returnErr(
+			"Could not find device",
+			`Unable to find device "${deviceName}"`
+		)
+	}
+
+    if (ObjC.unwrap(device.isConnected)) {
+        device.closeConnection
+		getApp().displayNotification(`Successfully disconnected from ${deviceName}`, 
+			{withTitle: "Disconnected", subtitle: "Done"}
+		)
+    } else {
+        device.openConnection
+		if (_waitForConnection()) {
+			getApp().displayNotification(`Successfully connected to ${deviceName}`, 
+				{withTitle: "Connected", subtitle: "Done"}
+			)
+		} else {
+			getApp().displayNotification(`Could not connect to device ${deviceName}`, 
+				{withTitle: "Error connecting", subtitle: "Error"}
+			)
+		}
+    }
+
+	return
+}
+
+// Standalone Alfred Action to turn off host bluetooth
+let turnOffBluetoothAction = () => {
+	if (!isBluetoothOn()) {
+		getApp().displayNotification("Bluetooth already is off", {withTitle: "Error"})
+		return
+	}
+
+	getHostController().powerState = 0
+	getApp().displayNotification("Turning off bluetooth", {withTitle: "Bluetooth"})
+}
+
+// Standalone Alfred Action to turn on host bluetooth
+let turnOnBluetoothStandaloneAction = () => {
+	if (isBluetoothOn()) {
+		getApp().displayNotification("Bluetooth already is on", {withTitle: "Error"})
+		return
+	}
+
+	getHostController().powerState = 1
+	getApp().displayNotification("Turning on bluetooth", {withTitle: "Bluetooth"})
+}
+
+// Order of commands matters
+const arg_to_func_map = {
+	"list": getPairedDevicesAction,
+	"toggle": toggleConnectionAction,
+	"turn-on-standalone": turnOnBluetoothStandaloneAction,
+	"turn-on": turnOnBluetoothAction,
+	"turn-off": turnOffBluetoothAction,
+}
+
+function main() {
+	let argv = getArgs()
+
+	let command = argv.at(0)
+	if (!(command in arg_to_func_map)) {
+		return returnErr(
+			"Error calling script",
+			"Invalid argument specified"
+		)
+	}
+
+	if (!isBluetoothOn() && command !== "turn-on") {
+		return JSON.stringify({
+			"items": [
+				{
+					"uid": "error",
+					"title": "Turn on bluetooth",
+					"subtitle": "Bluetooth is Off, press enter to turn it on",
+					"arg": "turn-on",
+				}
+			]
+		})
+	}
+
+	return arg_to_func_map[command]()
+}
+
+main()
