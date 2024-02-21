@@ -435,7 +435,13 @@ echo -n $query
 		</dict>
 	</array>
 	<key>readme</key>
-	<string></string>
+	<string>This workflow enables you to manage your Bluetooth device connections and Bluetooth state directly from Alfred. It offers the following functionalities:
+
+* Displays a list of all paired devices along with their connection status (connected or disconnected).
+* Connects or disconnects from a paired Bluetooth device.
+* Turns Bluetooth on or off for your device.
+
+For details see workflow github page - https://github.com/bosha/alfred-blueman-workflow</string>
 	<key>uidata</key>
 	<dict>
 		<key>0CACB16D-41C0-4B80-A567-CA571ABD549F</key>
@@ -550,13 +556,10 @@ echo -n $query
 			<string>log_level</string>
 		</dict>
 	</array>
-	<key>variables</key>
-	<dict>
-		<key>test</key>
-		<string>passed</string>
-	</dict>
+	<key>variablesdontexport</key>
+	<array/>
 	<key>version</key>
-	<string></string>
+	<string>0.1</string>
 	<key>webaddress</key>
 	<string>https://github.com/bosha/alfred-blueman-workflow</string>
 </dict>

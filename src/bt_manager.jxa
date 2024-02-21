@@ -159,33 +159,6 @@ class WorkflowBase {
 	}
 }
 
-// holds IOBluetoothHostController instance
-// let controller = null
-// holds current currentApplication() instance
-// let app = null
-
-// Returns current app instance
-// let getApp = () => {
-// 	if (app === null) {
-// 		app = Application.currentApplication()
-// 		app.includeStandardAdditions = true
-// 	}
-// 	return app
-// }
-
-// shortcut to return error for alfred
-// let returnErr = (title, subtitle) => {
-// 	return JSON.stringify({
-// 		"items": [
-// 			{
-// 				"uid": "error",
-// 				"title": title,
-// 				"subtitle": subtitle,
-// 			}
-// 		]
-// 	})
-// }
-
 class ListBtDevicesCommand extends WorkflowBase {
     run() {
         log.debug("running list bluetooth devices command")
