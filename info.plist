@@ -467,7 +467,7 @@ echo -n $query
 				<key>escaping</key>
 				<integer>102</integer>
 				<key>script</key>
-				<string>open "x-apple.systempreferences:com.apple.settings.PrivacySecurity?Bluetooth"</string>
+				<string>open "x-apple.systempreferences:com.apple.preference.security?Privacy_Bluetooth"</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>

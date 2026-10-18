@@ -1,10 +1,15 @@
 ObjC.import("Foundation")
+ObjC.import("AppKit")
 ObjC.import("stdlib")
 ObjC.import("IOBluetooth")
 ObjC.import("CoreBluetooth")
 
 const LOG_LEVEL_VAR_NAME = "log_level"
-const BLUETOOTH_PERMISSION_SETTINGS_URL = "x-apple.systempreferences:com.apple.settings.PrivacySecurity?Bluetooth"
+// The legacy security prefpane id is documented for the Privacy & Security
+// anchors since Ventura (13) and is still resolved by System Settings on
+// macOS 26/27, while the modern extension id is only verified on the latter.
+// The permission UI itself only runs on macOS 14+, where this link is valid
+const BLUETOOTH_PERMISSION_SETTINGS_URL = "x-apple.systempreferences:com.apple.preference.security?Privacy_Bluetooth"
 const OPEN_PERMISSION_SETTINGS_ARG = "__OPEN_BLUETOOTH_PERMISSION_SETTINGS__"
 
 let log = null
