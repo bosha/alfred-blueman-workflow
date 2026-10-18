@@ -103,6 +103,7 @@ class BtManager {
                 "name": ObjC.unwrap(device.nameOrAddress),
                 "connected": ObjC.unwrap(device.isConnected),
                 "address": ObjC.unwrap(device.addressString),
+                "battery": this.getBatteryLabel(device),
                 "instance": device
             }
         })
@@ -177,6 +178,43 @@ class BtManager {
     // devices always do
     isBleDevice(device) {
         return ObjC.unwrap(device.instance.classOfDevice) === 0
+    }
+
+    // Last-known battery levels from the IOBluetooth device object; 0 means
+    // the device does not report that value. BLE devices currently report
+    // nothing at all (all getters are 0)
+    getBatteryLabel(device) {
+        try {
+            let left = device.batteryPercentLeft
+            let right = device.batteryPercentRight
+            let caseLevel = device.batteryPercentCase
+            if (left > 0 || right > 0) {
+                let parts = []
+                if (left > 0) {
+                    parts.push(`🎧 L ${left}%`)
+                }
+                if (right > 0) {
+                    parts.push(`🎧 R ${right}%`)
+                }
+                if (caseLevel > 0) {
+                    parts.push(`🔋 ${caseLevel}%`)
+                }
+                return parts.join("  ")
+            }
+
+            let single = device.batteryPercentSingle
+            if (single > 0) {
+                return `🔋 ${single}%`
+            }
+
+            let combined = device.batteryPercentCombined
+            if (combined > 0) {
+                return `🔋 ${combined}%`
+            }
+        } catch (e) {
+            log.debug(`could not read battery level: ${e}`)
+        }
+        return null
     }
 
     disconnectDevice(device) {
@@ -363,12 +401,22 @@ class ListBtDevicesCommand extends WorkflowBase {
         log.debug(`sorting devices with order '${sortOrder}'`)
         items = sorter.sort(items)
 
+        // Workflow setting: device addresses in the subtitle (on by default)
+        let showAddresses = this.getEnvVar("show_mac_addresses") !== "0"
+
         let results = []
         items.forEach(device => {
+            let subtitle = device.battery || ""
+            if (showAddresses) {
+                subtitle = subtitle === ""
+                    ? device.address
+                    : `${subtitle} (${device.address})`
+            }
+
             results.push({
                 "uid": device.name,
                 "title": device.name,
-                "subtitle": device.address,
+                "subtitle": subtitle,
                 "icon": {
                     "path": device.connected ? "./assets/on.png" : "./assets/off.png"
                 },

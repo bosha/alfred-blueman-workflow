@@ -2,7 +2,7 @@
 
 This workflow enables you to manage your Bluetooth device connections and Bluetooth state directly from Alfred. It offers the following functionalities:
 
-* Displays a list of all paired devices along with their connection status (connected or disconnected).
+* Displays a list of all paired devices along with their connection status (connected or disconnected) and battery level when the device reports it.
 * Connects or disconnects from a paired Bluetooth device.
 * Turns Bluetooth on or off for your device.
 
@@ -73,4 +73,5 @@ The workflow detects LE devices and reports that disconnecting them is not suppo
 The workflow exposes two configuration parameters in Alfred (Workflow -> Configure Workflow...):
 
 * **Sorting** — `Connected first` (default) shows connected devices at the top of the `btl` list, `Alphabetical` sorts devices by name, `Default` keeps the macOS order. The order within each group is preserved.
+* **MAC addresses** — show device addresses in the `btl` list (on by default).
 * **Logging Level** — defaults to `Info`. Useful only for development purposes.

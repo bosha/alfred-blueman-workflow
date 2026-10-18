@@ -643,6 +643,25 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<key>variable</key>
 			<string>sort_order</string>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<true/>
+				<key>required</key>
+				<false/>
+				<key>text</key>
+				<string>Show in the btl list</string>
+			</dict>
+			<key>description</key>
+			<string>Show device MAC addresses in the btl list</string>
+			<key>label</key>
+			<string>MAC addresses</string>
+			<key>type</key>
+			<string>checkbox</string>
+			<key>variable</key>
+			<string>show_mac_addresses</string>
+		</dict>
 	</array>
 	<key>variablesdontexport</key>
 	<array/>
