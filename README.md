@@ -70,4 +70,7 @@ The workflow detects LE devices and reports that disconnecting them is not suppo
 
 ## Settings
 
-Currently, it supports only one configuration parameter named 'debug level'. The default value is set to 'INFO'. You don't need to modify this unless you encounter issues with the workflow.
+The workflow exposes two configuration parameters in Alfred (Workflow -> Configure Workflow...):
+
+* **Sorting** — `Connected first` (default) shows connected devices at the top of the `btl` list, `Default` keeps the macOS order. The order within each group is preserved.
+* **Logging Level** — defaults to `Info`. Useful only for development purposes.

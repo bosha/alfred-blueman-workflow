@@ -613,6 +613,32 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<key>variable</key>
 			<string>log_level</string>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>connected_first</string>
+				<key>pairs</key>
+				<array>
+					<array>
+						<string>Connected first</string>
+						<string>connected_first</string>
+					</array>
+					<array>
+						<string>Default</string>
+						<string>default</string>
+					</array>
+				</array>
+			</dict>
+			<key>description</key>
+			<string>Order of devices in the btl list</string>
+			<key>label</key>
+			<string>Sorting</string>
+			<key>type</key>
+			<string>popupbutton</string>
+			<key>variable</key>
+			<string>sort_order</string>
+		</dict>
 	</array>
 	<key>variablesdontexport</key>
 	<array/>

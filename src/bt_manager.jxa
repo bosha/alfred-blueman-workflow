@@ -189,6 +189,28 @@ class BtManager {
 
 }
 
+// Device list ordering. Sorters are stateless: sort() must not mutate the
+// input and must preserve the original order within groups, so switching
+// modes never reshuffles devices inside a group
+class DefaultSorter {
+    sort(devices) {
+        return devices
+    }
+}
+
+class ConnectedFirstSorter {
+    sort(devices) {
+        return devices.filter(device => device.connected)
+            .concat(devices.filter(device => !device.connected))
+    }
+}
+
+const SORTERS = {
+    "default": new DefaultSorter(),
+    "connected_first": new ConnectedFirstSorter(),
+}
+const DEFAULT_SORT_ORDER = "connected_first"
+
 class WorkflowError extends Error {
 	constructor(title, subtitle, ...params) {
 		super(...params)
@@ -327,6 +349,12 @@ class ListBtDevicesCommand extends WorkflowBase {
             }
         }
         
+        // Workflow setting; unset or unknown falls back to the default order
+        let sortOrder = this.getEnvVar("sort_order")
+        let sorter = SORTERS[sortOrder] || SORTERS[DEFAULT_SORT_ORDER]
+        log.debug(`sorting devices with order '${sortOrder}'`)
+        items = sorter.sort(items)
+
         let results = []
         items.forEach(device => {
             results.push({
