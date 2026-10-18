@@ -58,9 +58,9 @@ tccutil reset All com.runningwithcrayons.Alfred
 
 ### Disconnecting devices on macOS 26.2 and newer
 
-On macOS 26.2+ (Tahoe and later) Apple rewrote the IOBluetooth framework as an asynchronous shim on top of CoreBluetooth, and the disconnect entry point broke in the process: `closeConnection` is accepted but silently does nothing (the daemon refuses it), and the alternative selectors (`disconnect`, `forceDisconnect`, ...) exist in the class metadata but are no longer callable. There is no public replacement API, and investigation down to the private `IOBluetoothCoreBluetoothCoordinator`/`CBClassicManager` classes and bluetoothd's own XPC logs confirms that **no unprivileged process can drop a system-owned Bluetooth connection** on these macOS versions — this is not a JXA limitation.
+On macOS 26.2+ (Tahoe and later) the Bluetooth disconnect API appears to be broken: `closeConnection` is accepted but silently does nothing, and there is no public replacement API. This is not a JXA limitation and not specific to this workflow — even [blueutil](https://github.com/toy/blueutil), the de-facto standard Bluetooth CLI for macOS, [cannot disconnect devices on modern macOS versions](https://github.com/toy/blueutil/issues/58) (the issue has been open since Monterey and remains unresolved).
 
-The workflow attempts the disconnect anyway, verifies whether it actually happened, and reports an error when it did not. On macOS versions where the API works, disconnecting functions normally. If Apple repairs the shim in a future update, disconnecting will start working again automatically — no workflow update needed.
+The workflow attempts the disconnect anyway, verifies whether it actually happened, and reports an error when it did not. On macOS versions where the API works, disconnecting functions normally. If Apple fixes this in a future update, disconnecting will start working again automatically — no workflow update needed.
 
 ## Settings
 
