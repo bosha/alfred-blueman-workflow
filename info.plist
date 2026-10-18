@@ -647,7 +647,7 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<key>config</key>
 			<dict>
 				<key>default</key>
-				<true/>
+				<false/>
 				<key>required</key>
 				<false/>
 				<key>text</key>

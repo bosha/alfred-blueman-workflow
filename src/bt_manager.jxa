@@ -401,8 +401,8 @@ class ListBtDevicesCommand extends WorkflowBase {
         log.debug(`sorting devices with order '${sortOrder}'`)
         items = sorter.sort(items)
 
-        // Workflow setting: device addresses in the subtitle (on by default)
-        let showAddresses = this.getEnvVar("show_mac_addresses") !== "0"
+        // Workflow setting: device addresses in the subtitle (off by default)
+        let showAddresses = this.getEnvVar("show_mac_addresses") === "1"
 
         let results = []
         items.forEach(device => {
