@@ -58,11 +58,13 @@ tccutil reset All com.runningwithcrayons.Alfred
 
 When the permission is missing the workflow detects it and points you to these settings — either with an actionable item in the `btl` list or with a notification for `bton`/`btoff`/toggle — instead of silently showing an empty device list.
 
-### Disconnecting devices on macOS 26.2 and newer
+### Disconnecting devices
 
-On macOS 26.2+ (Tahoe and later) the Bluetooth disconnect API appears to be broken: `closeConnection` is accepted but silently does nothing, and there is no public replacement API. This is not a JXA limitation and not specific to this workflow — even [blueutil](https://github.com/toy/blueutil), the de-facto standard Bluetooth CLI for macOS, [cannot disconnect devices on modern macOS versions](https://github.com/toy/blueutil/issues/58) (the issue has been open since Monterey and remains unresolved).
+Disconnecting works for devices connected over Bluetooth Classic — most keyboards, trackpads, mice, headphones and speakers.
 
-The workflow attempts the disconnect anyway, verifies whether it actually happened, and reports an error when it did not. On macOS versions where the API works, disconnecting functions normally. If Apple fixes this in a future update, disconnecting will start working again automatically — no workflow update needed.
+It does not work for Bluetooth LE devices, for example the Logitech MX Master 3S or Keychron K3 Max (shown as `HID BLE` in System Information). macOS keeps the LE link in the system HID stack, and there is no public API for a third-party app to drop it: `closeConnection` is accepted but has no Classic link to close, so nothing happens. Use Control Center -> Bluetooth -> device -> Disconnect instead. The same limitation affects other tools, which is why [blueutil's disconnect issue](https://github.com/toy/blueutil/issues/58) is still open.
+
+The workflow detects LE devices and reports that disconnecting them is not supported, instead of failing silently. For Classic devices it verifies that the connection actually dropped and reports an error when it did not.
 
 ## Settings
 

@@ -164,11 +164,19 @@ class BtManager {
         device.instance.openConnection
     }
 
+    // Since macOS 26 Bluetooth LE devices are served by the CoreBluetooth
+    // shim, and the IOBluetooth link APIs only work on Classic connections.
+    // For an LE device closeConnection is accepted but does nothing (there is
+    // no Classic link to close) and no public API can drop the system-owned LE
+    // link. LE devices report no Class of Device, Classic devices always do
+    isBleDevice(device) {
+        return ObjC.unwrap(device.instance.classOfDevice) === 0
+    }
+
     disconnectDevice(device) {
-        // On macOS 26.2+ closeConnection is accepted but silently does nothing
-        // (Apple removed the working disconnect surface from the IOBluetooth
-        // shim without a public replacement), so the caller must verify the
-        // result and report an error when it did not land
+        // Classic-only: must not be called for BLE devices (see isBleDevice),
+        // and even for Classic ones the result has to be verified because the
+        // call can be accepted without the link actually dropping
         device.instance.closeConnection
         return waitFor(() => !ObjC.unwrap(device.instance.isConnected), 3)
     }
@@ -359,6 +367,15 @@ class ToggleConnectionCommand extends WorkflowBase {
         log.debug(`Got device: ${JSON.stringify(device)}`)
 
         if (device.connected) {
+            if (mgr.isBleDevice(device)) {
+                log.error(`Cannot disconnect "${deviceName}": it is a Bluetooth LE device, and macOS does not let apps disconnect LE devices`)
+                this.currentApp.displayNotification(
+                    `Cannot disconnect ${deviceName}: macOS does not let apps disconnect Bluetooth LE devices. Use Control Center -> Bluetooth`, 
+                    {withTitle: "Blueman", subtitle: "Not supported for this device"}
+                )
+                return
+            }
+
             log.debug("Device is connected, attemping to disconnect it")
             if (mgr.disconnectDevice(device)) {
                 log.debug(`Successfully disconnected from "${deviceName}"`)
@@ -368,9 +385,9 @@ class ToggleConnectionCommand extends WorkflowBase {
                 return
             }
 
-            log.error(`Could not disconnect device "${deviceName}": closeConnection is a silent no-op on this macOS version`)
+            log.error(`Could not disconnect device "${deviceName}": closeConnection returned without dropping the connection`)
             this.currentApp.displayNotification(
-                `Could not disconnect ${deviceName}. This macOS version broke the Bluetooth disconnect API - see workflow README`, 
+                `Could not disconnect ${deviceName}. See workflow README for details`, 
                 {withTitle: "Blueman", subtitle: "Error disconnecting"}
             )
         } else {
