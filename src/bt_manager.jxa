@@ -167,8 +167,9 @@ class BtManager {
     // Since macOS 26 Bluetooth LE devices are served by the CoreBluetooth
     // shim, and the IOBluetooth link APIs only work on Classic connections.
     // For an LE device closeConnection is accepted but does nothing (there is
-    // no Classic link to close) and no public API can drop the system-owned LE
-    // link. LE devices report no Class of Device, Classic devices always do
+    // no Classic link to close) and no public API lets a third-party app drop
+    // the system-owned LE link. LE devices report no Class of Device, Classic
+    // devices always do
     isBleDevice(device) {
         return ObjC.unwrap(device.instance.classOfDevice) === 0
     }
