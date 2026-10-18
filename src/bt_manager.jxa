@@ -343,12 +343,26 @@ class WorkflowBase {
         }
 
         log.error("bluetooth permission is missing for the app hosting this workflow (usually Alfred). See workflow README")
-        this.currentApp.displayNotification(
+        this.notify(
             "Bluetooth permission is missing. Add the app running this workflow (usually Alfred) in Privacy & Security -> Bluetooth. Opening settings...",
-            {withTitle: "Blueman", subtitle: "Permission required"}
+            {withTitle: "Blueman", subtitle: "Permission required"},
+            true
         )
         openBluetoothPermissionSettings()
         return false
+    }
+
+    // Notification policy from the workflow settings: "on" (default),
+    // "errors" (only error notifications) or "off"
+    notify(message, options, isError = false) {
+        let mode = this.getEnvVar("notifications") || "on"
+        if (mode === "off") {
+            return
+        }
+        if (mode === "errors" && !isError) {
+            return
+        }
+        this.currentApp.displayNotification(message, options)
     }
 
 	returnResult(data) {
@@ -459,9 +473,10 @@ class ToggleConnectionCommand extends WorkflowBase {
         if (device.connected) {
             if (mgr.isBleDevice(device)) {
                 log.error(`Cannot disconnect "${deviceName}": it is a Bluetooth LE device, and macOS does not let apps disconnect LE devices`)
-                this.currentApp.displayNotification(
+                this.notify(
                     `Cannot disconnect ${deviceName}: macOS does not let apps disconnect Bluetooth LE devices. Use Control Center -> Bluetooth`, 
-                    {withTitle: "Blueman", subtitle: "Not supported for this device"}
+                    {withTitle: "Blueman", subtitle: "Not supported for this device"},
+                    true
                 )
                 return
             }
@@ -469,16 +484,17 @@ class ToggleConnectionCommand extends WorkflowBase {
             log.debug("Device is connected, attemping to disconnect it")
             if (mgr.disconnectDevice(device)) {
                 log.debug(`Successfully disconnected from "${deviceName}"`)
-                this.currentApp.displayNotification(`Successfully disconnected from ${deviceName}`, 
+                this.notify(`Successfully disconnected from ${deviceName}`, 
                     {withTitle: "Blueman", subtitle: "Disconnected"}
                 )
                 return
             }
 
             log.error(`Could not disconnect device "${deviceName}": closeConnection returned without dropping the connection`)
-            this.currentApp.displayNotification(
+            this.notify(
                 `Could not disconnect ${deviceName}. See workflow README for details`, 
-                {withTitle: "Blueman", subtitle: "Error disconnecting"}
+                {withTitle: "Blueman", subtitle: "Error disconnecting"},
+                true
             )
         } else {
             log.debug("Device is disconnected, attemping to connect to it")
@@ -486,21 +502,23 @@ class ToggleConnectionCommand extends WorkflowBase {
                 mgr.connectDevice(device)
             } catch (e) {
                 log.error(`Could not initiate connection to "${deviceName}": ${e}`)
-                this.currentApp.displayNotification(`Could not connect to device ${deviceName}`, 
-                    {withTitle: "Blueman", subtitle: "Error connecting"}
+                this.notify(`Could not connect to device ${deviceName}`, 
+                    {withTitle: "Blueman", subtitle: "Error connecting"},
+                    true
                 )
                 return
             }
 
             if (waitFor(() => ObjC.unwrap(device.instance.isConnected), 5)) {
                 log.debug(`Successfully connected to "${deviceName}"`)
-                this.currentApp.displayNotification(`Successfully connected to ${deviceName}`, 
+                this.notify(`Successfully connected to ${deviceName}`, 
                     {withTitle: "Blueman", subtitle: "Connected"}
                 )
             } else {
                 log.debug(`Could not connect to device "${deviceName}"`)
-                this.currentApp.displayNotification(`Could not connect to device ${deviceName}`, 
-                    {withTitle: "Blueman", subtitle: "Error connecting"}
+                this.notify(`Could not connect to device ${deviceName}`, 
+                    {withTitle: "Blueman", subtitle: "Error connecting"},
+                    true
                 )
             }
         }
@@ -520,7 +538,7 @@ class TurnBtOffCommand extends WorkflowBase {
 
         if (!mgr.isBluetoothOn()) {
             log.debug("bluetooth already turned off, exiting")
-            this.currentApp.displayNotification("Bluetooth already turned off",
+            this.notify("Bluetooth already turned off",
                 {withTitle: "Blueman", subtitle: "Error"}
             )
             return
@@ -528,15 +546,16 @@ class TurnBtOffCommand extends WorkflowBase {
 
         if (!mgr.turnOffBluetooth()) {
             log.error("timeout waiting for the bluetooth power state transition to OFF")
-            this.currentApp.displayNotification("Could not turn bluetooth off",
-                {withTitle: "Blueman", subtitle: "Error"}
+            this.notify("Could not turn bluetooth off",
+                {withTitle: "Blueman", subtitle: "Error"},
+                true
             )
             return
         }
 
         let msg = "Command to turn bluetooth OFF was successfully sent"
         log.debug(msg)
-        this.currentApp.displayNotification(msg, {withTitle: "Blueman", subtitle: "Success"})
+        this.notify(msg, {withTitle: "Blueman", subtitle: "Success"})
     }
 }
 
@@ -551,7 +570,7 @@ class TurnBtOnCommand extends WorkflowBase {
 
         if (mgr.isBluetoothOn()) {
             log.debug("bluetooth already turned on, exiting")
-            this.currentApp.displayNotification("Bluetooth already turned on",
+            this.notify("Bluetooth already turned on",
                 {withTitle: "Blueman", subtitle: "Error"}
             )
             return
@@ -559,15 +578,16 @@ class TurnBtOnCommand extends WorkflowBase {
 
         if (!mgr.turnOnBluetooth()) {
             log.error("timeout waiting for the bluetooth power state transition to ON")
-            this.currentApp.displayNotification("Could not turn bluetooth on",
-                {withTitle: "Blueman", subtitle: "Error"}
+            this.notify("Could not turn bluetooth on",
+                {withTitle: "Blueman", subtitle: "Error"},
+                true
             )
             return
         }
 
         let msg = "Command to turn bluetooth ON was successfully sent"
         log.debug(msg)
-        this.currentApp.displayNotification(msg, {withTitle: "Blueman", subtitle: "Success"})
+        this.notify(msg, {withTitle: "Blueman", subtitle: "Success"})
     }
 }
 

@@ -74,4 +74,5 @@ The workflow exposes two configuration parameters in Alfred (Workflow -> Configu
 
 * **Sorting** — `Connected first` (default) shows connected devices at the top of the `btl` list, `Alphabetical` sorts devices by name, `Default` keeps the macOS order. The order within each group is preserved.
 * **MAC addresses** — show device addresses in the `btl` list (off by default).
+* **Notifications** — `On` (default), `Only errors`, or `Off`.
 * **Logging Level** — defaults to `Info`. Useful only for development purposes.

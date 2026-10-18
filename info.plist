@@ -662,6 +662,36 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<key>variable</key>
 			<string>show_mac_addresses</string>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>on</string>
+				<key>pairs</key>
+				<array>
+					<array>
+						<string>On</string>
+						<string>on</string>
+					</array>
+					<array>
+						<string>Only errors</string>
+						<string>errors</string>
+					</array>
+					<array>
+						<string>Off</string>
+						<string>off</string>
+					</array>
+				</array>
+			</dict>
+			<key>description</key>
+			<string>Which notifications to show</string>
+			<key>label</key>
+			<string>Notifications</string>
+			<key>type</key>
+			<string>popupbutton</string>
+			<key>variable</key>
+			<string>notifications</string>
+		</dict>
 	</array>
 	<key>variablesdontexport</key>
 	<array/>
