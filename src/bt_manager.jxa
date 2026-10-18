@@ -1,8 +1,11 @@
 ObjC.import("Foundation")
 ObjC.import("stdlib")
 ObjC.import("IOBluetooth")
+ObjC.import("CoreBluetooth")
 
 const LOG_LEVEL_VAR_NAME = "log_level"
+const BLUETOOTH_PERMISSION_SETTINGS_URL = "x-apple.systempreferences:com.apple.settings.PrivacySecurity?Bluetooth"
+const OPEN_PERMISSION_SETTINGS_ARG = "__OPEN_BLUETOOTH_PERMISSION_SETTINGS__"
 
 let log = null
 
@@ -25,6 +28,28 @@ function waitFor(checkFn, timeoutSec, sliceSec = 0.3) {
             $.NSDate.dateWithTimeIntervalSinceNow(sliceSec))
     }
     return checkFn()
+}
+
+function getMacOSMajorVersion() {
+    return parseInt(ObjC.unwrap($.NSProcessInfo.processInfo.operatingSystemVersion).majorVersion)
+}
+
+// Since macOS Sonoma (14) every IOBluetooth call is gated by the Bluetooth
+// privacy permission (TCC), attributed to the app that runs this workflow -
+// Alfred. Alfred does not declare Bluetooth usage in its bundle, so macOS
+// never shows a permission prompt and the APIs degrade silently instead:
+// the paired device list just comes back empty, as if nothing were paired.
+function hasBluetoothPermission() {
+    if (getMacOSMajorVersion() < 14) {
+        return true
+    }
+    // 0 = not determined, 1 = restricted, 2 = denied, 3 = allowed always
+    return Number($.CBManager.authorization) === 3
+}
+
+function openBluetoothPermissionSettings() {
+    $.NSWorkspace.sharedWorkspace.openURL(
+        $.NSURL.URLWithString(BLUETOOTH_PERMISSION_SETTINGS_URL))
 }
 
 class SimpleLogger { 
@@ -214,6 +239,36 @@ class WorkflowBase {
         })
 	}
 
+	returnPermissionError() {
+        return JSON.stringify({
+            "items": [
+                {
+                    "uid": "jl-bt-permission",
+                    "title": "Bluetooth permission is missing",
+                    "subtitle": "Press Enter to open Privacy & Security settings, then add Alfred under Bluetooth",
+                    "valid": true,
+                    "arg": OPEN_PERMISSION_SETTINGS_ARG,
+                }
+            ]
+        })
+	}
+
+    // For commands triggered directly (turn on/off/toggle), where there is no
+    // Alfred result list to render: notify the user and open the settings pane
+    ensureBluetoothPermission() {
+        if (hasBluetoothPermission()) {
+            return true
+        }
+
+        log.error("bluetooth permission is missing for the app hosting this workflow (usually Alfred). See workflow README")
+        this.currentApp.displayNotification(
+            "Bluetooth permission is missing. Add the app running this workflow (usually Alfred) in Privacy & Security -> Bluetooth. Opening settings...",
+            {withTitle: "Blueman", subtitle: "Permission required"}
+        )
+        openBluetoothPermissionSettings()
+        return false
+    }
+
 	returnResult(data) {
         return JSON.stringify({
             "items": data
@@ -224,8 +279,13 @@ class WorkflowBase {
 class ListBtDevicesCommand extends WorkflowBase {
     run() {
         log.debug("running list bluetooth devices command")
+        if (!hasBluetoothPermission()) {
+            log.error("bluetooth permission is missing for the app hosting this workflow (usually Alfred). See workflow README")
+            return this.returnPermissionError()
+        }
+
         let mgr = new BtManager()
-        
+
         let items = mgr.getPairedDevices()
         log.debug(`got '${items.length}' paired bluetooth devices`)
         if (items.length === 0) {
@@ -272,6 +332,10 @@ class ListBtDevicesCommand extends WorkflowBase {
 class ToggleConnectionCommand extends WorkflowBase {
     run() {
         log.debug("running toggle command")
+        if (!this.ensureBluetoothPermission()) {
+            return
+        }
+
         let mgr = new BtManager()
 
         let deviceName = this.args.at(1)
@@ -341,6 +405,10 @@ class ToggleConnectionCommand extends WorkflowBase {
 class TurnBtOffCommand extends WorkflowBase {
     run() {
         log.debug("running command to turn bluetooth OFF")
+        if (!this.ensureBluetoothPermission()) {
+            return
+        }
+
         let mgr = new BtManager()
 
         if (!mgr.isBluetoothOn()) {
@@ -368,6 +436,10 @@ class TurnBtOffCommand extends WorkflowBase {
 class TurnBtOnCommand extends WorkflowBase {
     run() {
         log.debug("running command to turn bluetooth ON")
+        if (!this.ensureBluetoothPermission()) {
+            return
+        }
+
         let mgr = new BtManager()
 
         if (mgr.isBluetoothOn()) {

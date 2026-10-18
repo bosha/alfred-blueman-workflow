@@ -56,6 +56,8 @@ If the workflow worked before and broke right after a macOS upgrade, the grant m
 tccutil reset All com.runningwithcrayons.Alfred
 ```
 
+When the permission is missing the workflow detects it and points you to these settings — either with an actionable item in the `btl` list or with a notification for `bton`/`btoff`/toggle — instead of silently showing an empty device list.
+
 ### Disconnecting devices on macOS 26.2 and newer
 
 On macOS 26.2+ (Tahoe and later) the Bluetooth disconnect API appears to be broken: `closeConnection` is accepted but silently does nothing, and there is no public replacement API. This is not a JXA limitation and not specific to this workflow — even [blueutil](https://github.com/toy/blueutil), the de-facto standard Bluetooth CLI for macOS, [cannot disconnect devices on modern macOS versions](https://github.com/toy/blueutil/issues/58) (the issue has been open since Monterey and remains unresolved).

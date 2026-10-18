@@ -39,6 +39,18 @@
 			</dict>
 			<dict>
 				<key>destinationuid</key>
+				<string>A9B93538-4B8F-4CE9-B0CB-6753D353A738</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>B1C884FB-A86C-4F20-A8E1-630376BF96E1</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
 				<string>62780805-57C1-4A16-A1F9-9C24EB09D74C</string>
 				<key>modifiers</key>
 				<integer>0</integer>
@@ -270,6 +282,20 @@ echo -n $query
 						<key>uid</key>
 						<string>66A81D23-A6B9-4948-B840-13155C1AB666</string>
 					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>__OPEN_BLUETOOTH_PERMISSION_SETTINGS__</string>
+						<key>outputlabel</key>
+						<string>Open Bluetooth permission settings</string>
+						<key>uid</key>
+						<string>B1C884FB-A86C-4F20-A8E1-630376BF96E1</string>
+					</dict>
 				</array>
 				<key>elselabel</key>
 				<string>Connect to Device</string>
@@ -433,6 +459,29 @@ echo -n $query
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>open "x-apple.systempreferences:com.apple.settings.PrivacySecurity?Bluetooth"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>A9B93538-4B8F-4CE9-B0CB-6753D353A738</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>This workflow enables you to manage your Bluetooth device connections and Bluetooth state directly from Alfred. It offers the following functionalities:
@@ -475,6 +524,15 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<real>30</real>
 			<key>ypos</key>
 			<real>775</real>
+		</dict>
+		<key>A9B93538-4B8F-4CE9-B0CB-6753D353A738</key>
+		<dict>
+			<key>note</key>
+			<string>Open Bluetooth permission settings</string>
+			<key>xpos</key>
+			<real>455</real>
+			<key>ypos</key>
+			<real>260</real>
 		</dict>
 		<key>55DE8F2C-A3B7-4DCA-8B70-2419B08E6EF0</key>
 		<dict>
