@@ -205,9 +205,17 @@ class ConnectedFirstSorter {
     }
 }
 
+class AlphabeticalSorter {
+    sort(devices) {
+        return devices.slice().sort((a, b) =>
+            a.name.localeCompare(b.name, undefined, { sensitivity: "base" }))
+    }
+}
+
 const SORTERS = {
     "default": new DefaultSorter(),
     "connected_first": new ConnectedFirstSorter(),
+    "alphabetical": new AlphabeticalSorter(),
 }
 const DEFAULT_SORT_ORDER = "connected_first"
 

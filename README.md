@@ -72,5 +72,5 @@ The workflow detects LE devices and reports that disconnecting them is not suppo
 
 The workflow exposes two configuration parameters in Alfred (Workflow -> Configure Workflow...):
 
-* **Sorting** — `Connected first` (default) shows connected devices at the top of the `btl` list, `Default` keeps the macOS order. The order within each group is preserved.
+* **Sorting** — `Connected first` (default) shows connected devices at the top of the `btl` list, `Alphabetical` sorts devices by name, `Default` keeps the macOS order. The order within each group is preserved.
 * **Logging Level** — defaults to `Info`. Useful only for development purposes.
