@@ -38,6 +38,30 @@ Regarding MacOS version and devices: This workflow functions perfectly on my Mac
 * **bton**: Turns on Bluetooth on your device.
 * **btoff**: Turns off Bluetooth on your device.
 
+## Troubleshooting
+
+### Bluetooth permission (macOS Sonoma 14 and newer)
+
+Starting with macOS Sonoma (14), access to the IOBluetooth framework is gated by the Bluetooth privacy permission (TCC). The permission is attributed to the app that runs the workflow — Alfred — and because Alfred does not declare Bluetooth usage in its bundle, **macOS will never show a permission prompt**: the workflow just silently misbehaves (device connection status missing in the list, power toggle and connect/disconnect doing nothing).
+
+Grant the permission manually:
+
+1. Open `System Settings -> Privacy & Security -> Bluetooth`
+2. Press the ➕ button and add the Alfred you are using (e.g. `Alfred 5.app` from `/Applications`)
+3. Make sure the toggle next to Alfred is enabled
+
+If the workflow worked before and broke right after a macOS upgrade, the grant may have been scrambled by the upgrade. Reset it and grant again:
+
+```shell
+tccutil reset All com.runningwithcrayons.Alfred
+```
+
+### Disconnecting devices on macOS 26.2 and newer
+
+On macOS 26.2+ (Tahoe and later) Apple rewrote the IOBluetooth framework as an asynchronous shim on top of CoreBluetooth, and the disconnect entry point broke in the process: `closeConnection` is accepted but silently does nothing (the daemon refuses it), and the alternative selectors (`disconnect`, `forceDisconnect`, ...) exist in the class metadata but are no longer callable. There is no public replacement API, and investigation down to the private `IOBluetoothCoreBluetoothCoordinator`/`CBClassicManager` classes and bluetoothd's own XPC logs confirms that **no unprivileged process can drop a system-owned Bluetooth connection** on these macOS versions — this is not a JXA limitation.
+
+The workflow attempts the disconnect anyway, verifies whether it actually happened, and reports an error when it did not. On macOS versions where the API works, disconnecting functions normally. If Apple repairs the shim in a future update, disconnecting will start working again automatically — no workflow update needed.
+
 ## Settings
 
 Currently, it supports only one configuration parameter named 'debug level'. The default value is set to 'INFO'. You don't need to modify this unless you encounter issues with the workflow.

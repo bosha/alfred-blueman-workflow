@@ -6,6 +6,27 @@ const LOG_LEVEL_VAR_NAME = "log_level"
 
 let log = null
 
+// Poll `checkFn` until it returns true or `timeoutSec` elapses, servicing the
+// main NSRunLoop while waiting.
+//
+// Since macOS 26 (Tahoe) the IOBluetooth framework is an asynchronous shim on
+// top of CoreBluetooth ("IOBluetoothCoreBluetoothCoordinator"): results arrive
+// as runloop callbacks and mutating calls (setPowerState, openConnection, ...)
+// return before the operation completes. A plain sleep (delay()) never observes
+// those callbacks and a short-lived process may exit before the operation lands
+// at all, so every wait in this workflow goes through this helper instead.
+function waitFor(checkFn, timeoutSec, sliceSec = 0.3) {
+    let deadline = $.NSDate.dateWithTimeIntervalSinceNow(timeoutSec)
+    while (deadline.timeIntervalSinceNow > 0) {
+        if (checkFn()) {
+            return true
+        }
+        $.NSRunLoop.currentRunLoop.runUntilDate(
+            $.NSDate.dateWithTimeIntervalSinceNow(sliceSec))
+    }
+    return checkFn()
+}
+
 class SimpleLogger { 
     logLevel = null
 
@@ -75,15 +96,56 @@ class BtManager {
     }
 
     isBluetoothOn() {
-        return this._getHostController().powerState === 0 ? false : true
+        // powerState values: 0 = off, 1 = on. Since macOS 26 the CoreBluetooth
+        // shim may briefly report an uninitialized state (2) in a freshly
+        // started process, so give it a moment before deciding
+        let state = this._getHostController().powerState
+        if (state === 2) {
+            waitFor(() => this._getHostController().powerState !== 2, 2)
+            state = this._getHostController().powerState
+        }
+        return state === 1
     }
 
     turnOffBluetooth() {
-        this._getHostController().powerState = 0
+        return this._setPowerState(0)
     }
 
     turnOnBluetooth() {
-        this._getHostController().powerState = 1
+        return this._setPowerState(1)
+    }
+
+    _setPowerState(value) {
+        let controller = this._getHostController()
+        controller.powerState = value
+        // The transition is asynchronous since macOS 26: keep the process
+        // alive (and the runloop serviced) until it actually lands
+        return waitFor(() => controller.powerState === value, 3)
+    }
+
+    connectDevice(device) {
+        // macOS 26 (Tahoe)+: the JXA bridge resolves `openConnection` to the
+        // one-argument `openConnection:` selector, so the old property-style
+        // invocation silently mis-dispatches and connects nothing
+        // (https://github.com/bosha/alfred-blueman-workflow/issues/3).
+        try {
+            device.instance.openConnection(device.instance)
+            return
+        } catch (e) {
+            log.debug(`openConnection(device) failed with "${e}", falling back to legacy invocation`)
+        }
+        // Pre-Tahoe JXA bridge: zero-argument methods are invoked by plain
+        // property access
+        device.instance.openConnection
+    }
+
+    disconnectDevice(device) {
+        // On macOS 26.2+ closeConnection is accepted but silently does nothing
+        // (Apple removed the working disconnect surface from the IOBluetooth
+        // shim without a public replacement), so the caller must verify the
+        // result and report an error when it did not land
+        device.instance.closeConnection
+        return waitFor(() => !ObjC.unwrap(device.instance.isConnected), 3)
     }
 
 }
@@ -232,28 +294,34 @@ class ToggleConnectionCommand extends WorkflowBase {
 
         log.debug(`Got device: ${JSON.stringify(device)}`)
 
-        // waits for connection
-        let _waitForConnection = () => {
-            for (let i=0; i < 3; i++) {
-                if (ObjC.unwrap(device.isConnected)) {
-                    return true
-                }
-                delay(0.5)
-            }
-            return false
-        }
-
-
         if (device.connected) {
             log.debug("Device is connected, attemping to disconnect it")
-            device.instance.closeConnection
-            this.currentApp.displayNotification(`Successfully disconnected from ${deviceName}`, 
-                {withTitle: "Blueman", subtitle: "Disconnected"}
+            if (mgr.disconnectDevice(device)) {
+                log.debug(`Successfully disconnected from "${deviceName}"`)
+                this.currentApp.displayNotification(`Successfully disconnected from ${deviceName}`, 
+                    {withTitle: "Blueman", subtitle: "Disconnected"}
+                )
+                return
+            }
+
+            log.error(`Could not disconnect device "${deviceName}": closeConnection is a silent no-op on this macOS version`)
+            this.currentApp.displayNotification(
+                `Could not disconnect ${deviceName}. This macOS version broke the Bluetooth disconnect API - see workflow README`, 
+                {withTitle: "Blueman", subtitle: "Error disconnecting"}
             )
         } else {
             log.debug("Device is disconnected, attemping to connect to it")
-            device.instance.openConnection
-            if (_waitForConnection()) {
+            try {
+                mgr.connectDevice(device)
+            } catch (e) {
+                log.error(`Could not initiate connection to "${deviceName}": ${e}`)
+                this.currentApp.displayNotification(`Could not connect to device ${deviceName}`, 
+                    {withTitle: "Blueman", subtitle: "Error connecting"}
+                )
+                return
+            }
+
+            if (waitFor(() => ObjC.unwrap(device.instance.isConnected), 5)) {
                 log.debug(`Successfully connected to "${deviceName}"`)
                 this.currentApp.displayNotification(`Successfully connected to ${deviceName}`, 
                     {withTitle: "Blueman", subtitle: "Connected"}
@@ -283,7 +351,14 @@ class TurnBtOffCommand extends WorkflowBase {
             return
         }
 
-        mgr.turnOffBluetooth()
+        if (!mgr.turnOffBluetooth()) {
+            log.error("timeout waiting for the bluetooth power state transition to OFF")
+            this.currentApp.displayNotification("Could not turn bluetooth off",
+                {withTitle: "Blueman", subtitle: "Error"}
+            )
+            return
+        }
+
         let msg = "Command to turn bluetooth OFF was successfully sent"
         log.debug(msg)
         this.currentApp.displayNotification(msg, {withTitle: "Blueman", subtitle: "Success"})
@@ -303,7 +378,14 @@ class TurnBtOnCommand extends WorkflowBase {
             return
         }
 
-        mgr.turnOnBluetooth()
+        if (!mgr.turnOnBluetooth()) {
+            log.error("timeout waiting for the bluetooth power state transition to ON")
+            this.currentApp.displayNotification("Could not turn bluetooth on",
+                {withTitle: "Blueman", subtitle: "Error"}
+            )
+            return
+        }
+
         let msg = "Command to turn bluetooth ON was successfully sent"
         log.debug(msg)
         this.currentApp.displayNotification(msg, {withTitle: "Blueman", subtitle: "Success"})
@@ -337,8 +419,8 @@ function run() {
     }
     let args = ObjC.deepUnwrap(rawArgs).slice(4)
 
-    if (args.count < 3) {
-        log.error("Invalid number of arguments passed")
+    if (args.length < 1) {
+        return log.error("Invalid number of arguments passed")
     }
 
     let command = args.at(0)
