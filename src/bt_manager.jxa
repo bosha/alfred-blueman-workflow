@@ -531,19 +531,23 @@ class ToggleConnectionCommand extends WorkflowBase {
         let deviceName = this.args.at(1)
         if (deviceName === undefined) {
             log.error("missing required parameter \"deviceName\"")
-            return this.returnErr(
-                "Error running toggle",
-                "Invalid number of arguments specified"
+            this.notify(
+                "Could not toggle the selected device: no device name was provided",
+                {withTitle: "Blueman", subtitle: "Invalid arguments"},
+                true
             )
+            return
         }
 
         let device = mgr.getDeviceByName(deviceName)
         if (device === null) {
             log.error(`Could not find device with name "${deviceName}"`)
-            return this.returnErr(
-                "Could not find device",
-                `Unable to find device "${deviceName}"`
+            this.notify(
+                `Could not find "${deviceName}". It may have been unpaired or renamed.`,
+                {withTitle: "Blueman", subtitle: "Device not found"},
+                true
             )
+            return
         }
 
         log.debug(`Got device: ${JSON.stringify(device)}`)
