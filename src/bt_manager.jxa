@@ -7,16 +7,21 @@ ObjC.import("CoreBluetooth")
 // Environment variables set by Alfred (workflow settings plus Alfred's own
 // variables). Keep the names here instead of inlining them at call sites.
 const ENV_VARS = {
+    ALFRED_VERSION: "alfred_version",
     LOG_LEVEL: "log_level",
     NOTIFICATIONS: "notifications",
     SORT_ORDER: "sort_order",
     SHOW_MAC_ADDRESSES: "show_mac_addresses",
     WORKFLOW_BUNDLE_ID: "alfred_workflow_bundleid",
+    WORKFLOW_VERSION: "alfred_workflow_version",
 }
 
 // Known Alfred environment variables and how to parse them. Every command
 // reads the parsed values through `this.config.<key>`.
 const CONFIG_SCHEMA = {
+    alfredVersion: {
+        env: ENV_VARS.ALFRED_VERSION,
+    },
     logLevel: {
         env: ENV_VARS.LOG_LEVEL,
         default: "error",
@@ -34,6 +39,9 @@ const CONFIG_SCHEMA = {
     },
     workflowBundleId: {
         env: ENV_VARS.WORKFLOW_BUNDLE_ID,
+    },
+    workflowVersion: {
+        env: ENV_VARS.WORKFLOW_VERSION,
     },
 }
 
@@ -86,28 +94,6 @@ function waitFor(checkFn, timeoutSec, sliceSec = 0.3) {
     return checkFn()
 }
 
-function getMacOSMajorVersion() {
-    return parseInt(ObjC.unwrap($.NSProcessInfo.processInfo.operatingSystemVersion).majorVersion)
-}
-
-// Since macOS Sonoma (14) every IOBluetooth call is gated by the Bluetooth
-// privacy permission (TCC), attributed to the app that runs this workflow -
-// Alfred. Alfred does not declare Bluetooth usage in its bundle, so macOS
-// never shows a permission prompt and the APIs degrade silently instead:
-// the paired device list just comes back empty, as if nothing were paired.
-function hasBluetoothPermission() {
-    if (getMacOSMajorVersion() < 14) {
-        return true
-    }
-    // 0 = not determined, 1 = restricted, 2 = denied, 3 = allowed always
-    return Number($.CBManager.authorization) === 3
-}
-
-function openBluetoothPermissionSettings() {
-    $.NSWorkspace.sharedWorkspace.openURL(
-        $.NSURL.URLWithString(BLUETOOTH_PERMISSION_SETTINGS_URL))
-}
-
 class SimpleLogger { 
     logLevel = null
 
@@ -148,13 +134,15 @@ class BtManager {
         let items = this.getPairedDevicesObjs()
 
         return Array.from(items, device => {
-            let name = ObjC.unwrap(device.nameOrAddress)
-            let connected = ObjC.unwrap(device.isConnected)
+            let classOfDevice = ObjC.unwrap(device.classOfDevice)
             return {
                 "name": ObjC.unwrap(device.nameOrAddress),
                 "connected": ObjC.unwrap(device.isConnected),
                 "address": ObjC.unwrap(device.addressString),
                 "battery": this.getBatteryLabel(device),
+                // Since macOS 26 LE devices are served by the CoreBluetooth
+                // shim and report no Class of Device; Classic devices always do
+                "isBle": classOfDevice === 0,
                 "instance": device
             }
         })
@@ -177,7 +165,26 @@ class BtManager {
         return this.controller
     }
 
-    isBluetoothOn() {
+    // Since macOS Sonoma (14) every IOBluetooth call is gated by the Bluetooth
+    // privacy permission (TCC), attributed to the app that runs this workflow -
+    // Alfred. Alfred does not declare Bluetooth usage in its bundle, so macOS
+    // never shows a permission prompt and the APIs degrade silently instead:
+    // the paired device list just comes back empty, as if nothing were paired.
+    getBluetoothAuthorization() {
+        let version = ObjC.unwrap($.NSProcessInfo.processInfo.operatingSystemVersion)
+        if (parseInt(version.majorVersion) < 14) {
+            return null
+        }
+        // 0 = not determined, 1 = restricted, 2 = denied, 3 = allowed always
+        return Number($.CBManager.authorization)
+    }
+
+    hasBluetoothPermission() {
+        let authorization = this.getBluetoothAuthorization()
+        return authorization === null || authorization === 3
+    }
+
+    getPowerState() {
         // powerState values: 0 = off, 1 = on. Since macOS 26 the CoreBluetooth
         // shim may briefly report an uninitialized state (2) in a freshly
         // started process, so give it a moment before deciding
@@ -186,7 +193,11 @@ class BtManager {
             waitFor(() => this._getHostController().powerState !== 2, 2)
             state = this._getHostController().powerState
         }
-        return state === 1
+        return state
+    }
+
+    isBluetoothOn() {
+        return this.getPowerState() === 1
     }
 
     turnOffBluetooth() {
@@ -219,16 +230,6 @@ class BtManager {
         // Pre-Tahoe JXA bridge: zero-argument methods are invoked by plain
         // property access
         device.instance.openConnection
-    }
-
-    // Since macOS 26 Bluetooth LE devices are served by the CoreBluetooth
-    // shim, and the IOBluetooth link APIs only work on Classic connections.
-    // For an LE device closeConnection is accepted but does nothing (there is
-    // no Classic link to close) and no public API lets a third-party app drop
-    // the system-owned LE link. LE devices report no Class of Device, Classic
-    // devices always do
-    isBleDevice(device) {
-        return ObjC.unwrap(device.instance.classOfDevice) === 0
     }
 
     // Last-known battery levels from the IOBluetooth device object; 0 means
@@ -269,9 +270,9 @@ class BtManager {
     }
 
     disconnectDevice(device) {
-        // Classic-only: must not be called for BLE devices (see isBleDevice),
-        // and even for Classic ones the result has to be verified because the
-        // call can be accepted without the link actually dropping
+        // Classic-only: must not be called for BLE devices, and even for
+        // Classic ones the result has to be verified because the call can be
+        // accepted without the link actually dropping
         device.instance.closeConnection
         return waitFor(() => !ObjC.unwrap(device.instance.isConnected), 3)
     }
@@ -338,6 +339,25 @@ class WorkflowBase {
         this.args = ObjC.deepUnwrap(args).slice(4)
 	}
 
+    getMacOSVersionString() {
+        let version = ObjC.unwrap($.NSProcessInfo.processInfo.operatingSystemVersion)
+        return `${version.majorVersion}.${version.minorVersion}.${version.patchVersion}`
+    }
+
+    openPermissionsSettings(path) {
+        $.NSWorkspace.sharedWorkspace.openURL($.NSURL.URLWithString(path))
+    }
+
+    shellOutput(command) {
+        try {
+            let output = this.currentApp.doShellScript(command)
+            return output.trim() || "unknown"
+        } catch (e) {
+            log.debug(`could not run '${command}': ${e}`)
+            return "unknown"
+        }
+    }
+
 	setEnvVar(name, value) {
         let bundleid = this.config.workflowBundleId
         if (!bundleid) {
@@ -388,7 +408,8 @@ class WorkflowBase {
     // For commands triggered directly (turn on/off/toggle), where there is no
     // Alfred result list to render: notify the user and open the settings pane
     ensureBluetoothPermission() {
-        if (hasBluetoothPermission()) {
+        let mgr = new BtManager()
+        if (mgr.hasBluetoothPermission()) {
             return true
         }
 
@@ -398,7 +419,7 @@ class WorkflowBase {
             {withTitle: "Blueman", subtitle: "Permission required"},
             true
         )
-        openBluetoothPermissionSettings()
+        this.openPermissionsSettings(BLUETOOTH_PERMISSION_SETTINGS_URL)
         return false
     }
 
@@ -429,12 +450,11 @@ class WorkflowBase {
 class ListBtDevicesCommand extends WorkflowBase {
     run() {
         log.debug("running list bluetooth devices command")
-        if (!hasBluetoothPermission()) {
+        let mgr = new BtManager()
+        if (!mgr.hasBluetoothPermission()) {
             log.error("bluetooth permission is missing for the app hosting this workflow (usually Alfred). See workflow README")
             return this.returnPermissionError()
         }
-
-        let mgr = new BtManager()
 
         if (!mgr.isBluetoothOn()) {
             log.debug("bluetooth is off, offering to turn it on")
@@ -553,7 +573,7 @@ class ToggleConnectionCommand extends WorkflowBase {
         log.debug(`Got device: ${JSON.stringify(device)}`)
 
         if (device.connected) {
-            if (mgr.isBleDevice(device)) {
+            if (device.isBle) {
                 log.error(`Cannot disconnect "${deviceName}": it is a Bluetooth LE device, and macOS does not let apps disconnect LE devices`)
                 this.notify(
                     `Cannot disconnect ${deviceName}: macOS does not let apps disconnect Bluetooth LE devices. Use Control Center -> Bluetooth`, 
@@ -673,8 +693,146 @@ class TurnBtOnCommand extends WorkflowBase {
     }
 }
 
+const AUTHORIZATION_LABELS = {
+    0: "not determined",
+    1: "restricted",
+    2: "denied",
+    3: "granted",
+}
+
+const POWER_STATE_LABELS = {
+    0: "off",
+    1: "on",
+    2: "unknown",
+}
+
+class DiagnosticsCommand extends WorkflowBase {
+    run() {
+        log.debug("running diagnostics command")
+        let info = this.collectInfo()
+        let report = this.formatReport(info, false)
+        let redactedReport = this.formatReport(info, true)
+
+        return this.returnResult([
+            {
+                "uid": "bt-diagnostics",
+                "title": "Copy Bluetooth diagnostics",
+                "subtitle": info.summary,
+                "arg": report,
+                "text": {
+                    "copy": report,
+                    "largetype": report,
+                },
+                "mods": {
+                    "alt": {
+                        "arg": redactedReport,
+                        "subtitle": "Copy redacted diagnostics (device names hidden)",
+                    }
+                }
+            }
+        ])
+    }
+
+    collectInfo() {
+        let mgr = new BtManager()
+        let authorization = mgr.getBluetoothAuthorization()
+        let permission = authorization === null || authorization === 3
+
+        // Without the permission IOBluetooth reports no devices and no
+        // meaningful power state, so do not present that as "off" / "0 devices"
+        let powerState = permission ? mgr.getPowerState() : null
+        let devices = permission ? mgr.getPairedDevices() : []
+
+        let connectedCount = devices.filter(device => device.connected).length
+        let bleCount = devices.filter(device => device.isBle).length
+        let macOSVersion = this.getMacOSVersionString()
+
+        return {
+            macOSVersion: macOSVersion,
+            arch: this.shellOutput("/usr/bin/uname -m"),
+            model: this.shellOutput("/usr/sbin/sysctl -n hw.model"),
+            authorization: authorization,
+            permission: permission,
+            powerState: powerState,
+            devices: devices,
+            connectedCount: connectedCount,
+            classicCount: devices.length - bleCount,
+            bleCount: bleCount,
+            summary: `macOS ${macOSVersion} · `
+                + (permission ? "permission granted" : "permission missing")
+                + " · "
+                + (powerState === null
+                    ? "Bluetooth unknown"
+                    : `Bluetooth ${POWER_STATE_LABELS[powerState] || "unknown"}`)
+                + " · "
+                + (permission ? `${devices.length} devices` : "devices unavailable"),
+        }
+    }
+
+    permissionLabel(info) {
+        if (info.authorization === null) {
+            return "not required (macOS < 14)"
+        }
+        let label = AUTHORIZATION_LABELS[info.authorization] || "unknown"
+        return `${label} (authorization=${info.authorization})`
+    }
+
+    powerLabel(info) {
+        if (info.powerState === null) {
+            return "unknown (permission missing)"
+        }
+        return POWER_STATE_LABELS[info.powerState] || `unknown (${info.powerState})`
+    }
+
+    deviceCountLabel(info) {
+        if (!info.permission) {
+            return "unavailable (no Bluetooth permission)"
+        }
+        return `${info.devices.length} (connected: ${info.connectedCount}, `
+            + `Classic: ${info.classicCount}, LE: ${info.bleCount})`
+    }
+
+    formatReport(info, redact) {
+        let lines = [
+            redact ? "Blueman diagnostics (redacted)" : "Blueman diagnostics",
+            `Workflow: ${this.config.workflowVersion || "unknown"}`,
+            `Alfred: ${this.config.alfredVersion || "unknown"}`,
+            `macOS: ${info.macOSVersion} (${info.arch}, ${info.model})`,
+            `Bluetooth permission: ${this.permissionLabel(info)}`,
+            `Bluetooth power: ${this.powerLabel(info)}`,
+            `Paired devices: ${this.deviceCountLabel(info)}`,
+            `Settings: sort_order=${this.config.sortOrder || DEFAULT_SORT_ORDER}, `
+                + `show_mac_addresses=${this.config.showMacAddresses ? "on" : "off"}, `
+                + `notifications=${this.config.notifications}`,
+        ]
+
+        if (info.devices.length > 0) {
+            lines.push("Devices:")
+            info.devices.forEach((device, index) => {
+                let name = redact ? `Device ${index + 1}` : device.name
+                let address = !redact && this.config.showMacAddresses
+                    ? ` | ${device.address}`
+                    : ""
+                lines.push(
+                    `- ${name} | ${device.isBle ? "LE" : "Classic"} | `
+                    + `${device.connected ? "connected" : "disconnected"} | `
+                    + `battery: ${device.battery || "n/a"}${address}`)
+            })
+        }
+
+        if (!info.permission) {
+            lines.push("", "Grant Bluetooth permission to Alfred (Privacy & Security -> Bluetooth).")
+        } else if (info.powerState === 0) {
+            lines.push("", "Bluetooth is off; device states may be the last known values.")
+        }
+
+        return lines.join("\n")
+    }
+}
+
 const possibleCommands = {
     "list": ListBtDevicesCommand,
+    "diagnostics": DiagnosticsCommand,
     "toggle": ToggleConnectionCommand,
     "turn-on": TurnBtOnCommand,
     "turn-off": TurnBtOffCommand

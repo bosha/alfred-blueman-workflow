@@ -129,6 +129,21 @@
 				<false/>
 			</dict>
 		</array>
+		<key>3CC9121C-D758-4CF9-95F1-3B51528B0BC9</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>78526B29-80D7-4FC7-8AA8-3BE2C44B2D39</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>78526B29-80D7-4FC7-8AA8-3BE2C44B2D39</key>
+		<array/>
 	</dict>
 	<key>createdby</key>
 	<string>Bosha</string>
@@ -482,6 +497,74 @@ echo -n $query
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>alfredfiltersresults</key>
+				<false/>
+				<key>alfredfiltersresultsmatchmode</key>
+				<integer>0</integer>
+				<key>argumenttreatemptyqueryasnil</key>
+				<true/>
+				<key>argumenttrimmode</key>
+				<integer>0</integer>
+				<key>argumenttype</key>
+				<integer>1</integer>
+				<key>escaping</key>
+				<integer>68</integer>
+				<key>keyword</key>
+				<string>btdiag</string>
+				<key>queuedelaycustom</key>
+				<integer>3</integer>
+				<key>queuedelayimmediatelyinitially</key>
+				<true/>
+				<key>queuedelaymode</key>
+				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
+				<key>runningsubtext</key>
+				<string></string>
+				<key>script</key>
+				<string>/usr/bin/osascript -l JavaScript ./src/bt_manager.jxa diagnostics</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>subtext</key>
+				<string>Copy Bluetooth diagnostics for issue reports</string>
+				<key>title</key>
+				<string>Bluetooth Diagnostics</string>
+				<key>type</key>
+				<integer>0</integer>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>3CC9121C-D758-4CF9-95F1-3B51528B0BC9</string>
+			<key>version</key>
+			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>autopaste</key>
+				<false/>
+				<key>clipboardtext</key>
+				<string>{query}</string>
+				<key>ignoredynamicplaceholders</key>
+				<false/>
+				<key>transient</key>
+				<true/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.output.clipboard</string>
+			<key>uid</key>
+			<string>78526B29-80D7-4FC7-8AA8-3BE2C44B2D39</string>
+			<key>version</key>
+			<integer>3</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>This workflow enables you to manage your Bluetooth device connections and Bluetooth state directly from Alfred. It offers the following functionalities:
@@ -489,6 +572,7 @@ echo -n $query
 * Displays a list of all paired devices along with their connection status (connected or disconnected).
 * Connects or disconnects from a paired Bluetooth device.
 * Turns Bluetooth on or off for your device.
+* Copies a diagnostics report (btdiag) for issue reports.
 
 For details see workflow github page - https://github.com/bosha/alfred-blueman-workflow</string>
 	<key>uidata</key>
@@ -579,6 +663,24 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<real>30</real>
 			<key>ypos</key>
 			<real>120</real>
+		</dict>
+		<key>3CC9121C-D758-4CF9-95F1-3B51528B0BC9</key>
+		<dict>
+			<key>note</key>
+			<string>Copy Bluetooth diagnostics</string>
+			<key>xpos</key>
+			<real>30</real>
+			<key>ypos</key>
+			<real>900</real>
+		</dict>
+		<key>78526B29-80D7-4FC7-8AA8-3BE2C44B2D39</key>
+		<dict>
+			<key>note</key>
+			<string>Copy diagnostics to clipboard</string>
+			<key>xpos</key>
+			<real>310</real>
+			<key>ypos</key>
+			<real>900</real>
 		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>

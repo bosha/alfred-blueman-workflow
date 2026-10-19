@@ -37,8 +37,11 @@ Regarding MacOS version and devices: This workflow functions perfectly on my Mac
 * **btl**: Displays a list of all paired Bluetooth devices and their connection status.
 * **bton**: Turns on Bluetooth on your device.
 * **btoff**: Turns off Bluetooth on your device.
+* **btdiag**: Copies a diagnostics report for issue reports. Hold Option (`⌥`) to copy a redacted version without device names.
 
 ## Troubleshooting
+
+If you are reporting an issue, run `btdiag` first and paste the copied report into the issue. It includes the workflow, Alfred and macOS versions, Bluetooth permission and power state, current settings, and paired devices.
 
 ### Bluetooth permission (macOS Sonoma 14 and newer)
 
