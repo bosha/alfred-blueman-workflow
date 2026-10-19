@@ -1099,9 +1099,13 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<key>config</key>
 			<dict>
 				<key>default</key>
-				<string>connected_first</string>
+				<string>favorites_then_connected</string>
 				<key>pairs</key>
 				<array>
+					<array>
+						<string>Favorites, then connected</string>
+						<string>favorites_then_connected</string>
+					</array>
 					<array>
 						<string>Favorites first</string>
 						<string>favorites_first</string>

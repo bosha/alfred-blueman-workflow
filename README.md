@@ -115,7 +115,7 @@ This is a destructive, best-effort operation:
 
 ### Favorites
 
-Hold `⌥` (Option) and press `⏎` on a device in the `btl` list to star or unstar it. Starred devices show a `⭐` next to their name, and the `Favorites first` sorting option brings them to the top.
+Hold `⌥` (Option) and press `⏎` on a device in the `btl` list to star or unstar it. Starred devices show a `⭐` next to their name and are sorted to the top by default.
 
 Favorites are stored in the workflow's **Favorites** configuration field (Workflow -> Configure Workflow...), one device name per line. To unstar a device without using the list, delete its line there.
 
@@ -128,7 +128,12 @@ The workflow exposes nine configuration parameters in Alfred (Workflow -> Config
 - **Off keyword** — keyword used to turn Bluetooth off (default `btoff`).
 - **Toggle keyword** — keyword used to toggle Bluetooth on or off (default `btt`).
 - **Favorites** — starred devices, one name per line (see above).
-- **Sorting** — `Favorites first` brings starred devices to the top, `Connected first` (default) shows connected devices at the top of the `btl` list, `Alphabetical` sorts devices by name, `Default` keeps the macOS order. The order within each group is preserved.
+- **Sorting** — order of devices in the `btl` list. The order within each group is preserved.
+  - `Favorites, then connected` (default) — starred devices first, then connected devices, then the rest.
+  - `Favorites first` — starred devices at the top.
+  - `Connected first` — connected devices at the top.
+  - `Alphabetical` — sorted by device name.
+  - `Default` — keeps the macOS order.
 - **MAC addresses** — show device addresses in the `btl` list (off by default). When enabled, the list can also be filtered by address; when disabled, only device names are matched.
 - **Notifications** — `On` (default), `Only errors`, or `Off`.
 - **Logging Level** — defaults to `Info`. Useful only for development purposes.

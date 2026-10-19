@@ -799,13 +799,22 @@ class FavoritesFirstSorter {
     }
 }
 
+class FavoritesThenConnectedSorter {
+    sort(devices) {
+        return devices.filter(device => device.favorite)
+            .concat(devices.filter(device => !device.favorite && device.connected))
+            .concat(devices.filter(device => !device.favorite && !device.connected))
+    }
+}
+
 const SORTERS = {
     "default": new DefaultSorter(),
     "connected_first": new ConnectedFirstSorter(),
     "alphabetical": new AlphabeticalSorter(),
     "favorites_first": new FavoritesFirstSorter(),
+    "favorites_then_connected": new FavoritesThenConnectedSorter(),
 }
-const DEFAULT_SORT_ORDER = "connected_first"
+const DEFAULT_SORT_ORDER = "favorites_then_connected"
 // Alfred re-runs the Script Filter while the list is open, so connection
 // states stay current; seconds between refreshes
 const LIST_RERUN_SECONDS = 2
@@ -1006,7 +1015,10 @@ class WorkflowBase {
 
 	returnResult(data, rerun) {
         let response = {
-            "items": data
+            "items": data,
+            // Without this, Alfred re-orders results by its learned knowledge
+            // (the item `uid`s), overriding the sort the workflow computed.
+            "skipknowledge": true
         }
         if (rerun !== undefined) {
             response["rerun"] = rerun
@@ -1117,7 +1129,9 @@ class ListBtDevicesCommand extends WorkflowBase {
             }
 
             results.push({
-                "uid": device.name,
+                // No uid on purpose: Alfred would otherwise re-order the list
+                // by its learned knowledge, ignoring the sort computed above.
+                // (skipknowledge alone cannot undo knowledge already learned.)
                 "title": device.favorite ? `⭐ ${device.name}` : device.name,
                 "subtitle": subtitleParts.join(" · "),
                 "icon": {
