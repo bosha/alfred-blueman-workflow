@@ -4,7 +4,58 @@ ObjC.import("stdlib")
 ObjC.import("IOBluetooth")
 ObjC.import("CoreBluetooth")
 
-const LOG_LEVEL_VAR_NAME = "log_level"
+// Environment variables set by Alfred (workflow settings plus Alfred's own
+// variables). Keep the names here instead of inlining them at call sites.
+const ENV_VARS = {
+    LOG_LEVEL: "log_level",
+    NOTIFICATIONS: "notifications",
+    SORT_ORDER: "sort_order",
+    SHOW_MAC_ADDRESSES: "show_mac_addresses",
+    WORKFLOW_BUNDLE_ID: "alfred_workflow_bundleid",
+}
+
+// Known Alfred environment variables and how to parse them. Every command
+// reads the parsed values through `this.config.<key>`.
+const CONFIG_SCHEMA = {
+    logLevel: {
+        env: ENV_VARS.LOG_LEVEL,
+        default: "error",
+    },
+    notifications: {
+        env: ENV_VARS.NOTIFICATIONS,
+        default: "on",
+    },
+    sortOrder: {
+        env: ENV_VARS.SORT_ORDER,
+    },
+    showMacAddresses: {
+        env: ENV_VARS.SHOW_MAC_ADDRESSES,
+        parse: value => value === "1",
+    },
+    workflowBundleId: {
+        env: ENV_VARS.WORKFLOW_BUNDLE_ID,
+    },
+}
+
+class Config {
+    static getEnv(name) {
+        let value = ObjC.unwrap(
+            $.NSProcessInfo.processInfo.environment.objectForKey(name))
+        return value === undefined || value === null ? null : value
+    }
+
+    constructor() {
+        Object.keys(CONFIG_SCHEMA).forEach(key => {
+            let spec = CONFIG_SCHEMA[key]
+            let value = Config.getEnv(spec.env)
+            if (value === null && spec.default !== undefined) {
+                value = spec.default
+            }
+            this[key] = spec.parse ? spec.parse(value) : value
+        })
+    }
+}
+
 // The legacy security prefpane id is documented for the Privacy & Security
 // anchors since Ventura (13) and is still resolved by System Settings on
 // macOS 26/27, while the modern extension id is only verified on the latter.
@@ -271,11 +322,13 @@ class WorkflowError extends Error {
 }
 
 class WorkflowBase {
-	constructor(currentApp=null) {
+	constructor(currentApp=null, config=null) {
 		if (currentApp === null || currentApp === undefined) {
 			this.currentApp = Application.currentApplication()
 			this.currentApp.includeStandardAdditions = true
 		}
+
+		this.config = config || new Config()
 
 		let args = $.NSProcessInfo.processInfo.arguments
         if (args.count < 5) {
@@ -285,18 +338,12 @@ class WorkflowBase {
         this.args = ObjC.deepUnwrap(args).slice(4)
 	}
 
-	getEnvVar(name) {
-		let variable = ObjC.unwrap(
-            $.NSProcessInfo.processInfo.environment.objectForKey(name))
-        return variable === undefined ? null : variable
-	}
-
 	setEnvVar(name, value) {
-        let bundleid = this.getEnvVar("alfred_workflow_bundleid")
+        let bundleid = this.config.workflowBundleId
         if (!bundleid) {
-            log.error("\"aflred_workflow_bundleid\" is not set")
+            log.error(`"${ENV_VARS.WORKFLOW_BUNDLE_ID}" is not set`)
             throw new Error(
-                "could not read from \"alfred_workflow_bundleid\" env variable. Check that bundleid for workflow is set")
+                `could not read from "${ENV_VARS.WORKFLOW_BUNDLE_ID}" env variable. Check that bundleid for workflow is set`)
         }
 
         Application("com.runningwithcrayons.Alfred").setConfiguration(name, {
@@ -358,7 +405,7 @@ class WorkflowBase {
     // Notification policy from the workflow settings: "on" (default),
     // "errors" (only error notifications) or "off"
     notify(message, options, isError = false) {
-        let mode = this.getEnvVar("notifications") || "on"
+        let mode = this.config.notifications
         if (mode === "off") {
             return
         }
@@ -414,12 +461,20 @@ class ListBtDevicesCommand extends WorkflowBase {
             )
         }
 
+        // Workflow setting: device addresses in the subtitle (off by default)
+        let showAddresses = this.config.showMacAddresses
+
         let query = this.args.at(1)
 
         if (query !== null && query !== undefined) {
             log.debug(`filtering devices by query '${query}'`)
+            let normalizedQuery = query.toLowerCase()
             items = items.filter(device => {
-                return device.name.toLowerCase().includes(query.toLowerCase())
+                if (device.name.toLowerCase().includes(normalizedQuery)) {
+                    return true
+                }
+                // Hidden addresses should not leak through search
+                return showAddresses && device.address.toLowerCase().includes(normalizedQuery)
             })
 
             if (items.length === 0) {
@@ -432,13 +487,10 @@ class ListBtDevicesCommand extends WorkflowBase {
         }
         
         // Workflow setting; unset or unknown falls back to the default order
-        let sortOrder = this.getEnvVar("sort_order")
+        let sortOrder = this.config.sortOrder
         let sorter = SORTERS[sortOrder] || SORTERS[DEFAULT_SORT_ORDER]
         log.debug(`sorting devices with order '${sortOrder}'`)
         items = sorter.sort(items)
-
-        // Workflow setting: device addresses in the subtitle (off by default)
-        let showAddresses = this.getEnvVar("show_mac_addresses") === "1"
 
         let results = []
         items.forEach(device => {
@@ -625,17 +677,11 @@ const possibleCommands = {
 }
 
 function run() {
-    // Small code duplication is better than excess complexity
-    let logLevel = ObjC.unwrap(
-        $.NSProcessInfo.processInfo.environment.objectForKey(LOG_LEVEL_VAR_NAME))
-    if (logLevel === undefined || logLevel === null) {
-        logLevel = "error"
-    } 
-
-    // Don't want to overcompliate this and pass down thru all dependencies.
-    // To make this easier logging is a simple global variable initialized here
-    // and accessible in whole script
-    log = new SimpleLogger(logLevel)
+    // Logging is a simple global initialized here (rather than threaded
+    // through every dependency) and used across the whole script. Config is
+    // parsed once here and passed to the command.
+    let config = new Config()
+    log = new SimpleLogger(config.logLevel)
 
     let rawArgs = $.NSProcessInfo.processInfo.arguments
     if (rawArgs.count < 5) {
@@ -656,6 +702,6 @@ function run() {
         return log.error("Invalid command specified")
     }
 
-    let runner = new possibleCommands[command]()
+    let runner = new possibleCommands[command](null, config)
     return runner.run()
 }
