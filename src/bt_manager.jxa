@@ -432,6 +432,50 @@ class BtManager {
         return waitFor(() => !ObjC.unwrap(device.instance.isConnected), 3)
     }
 
+    // Unpairing uses the private `remove` selector (the same approach as
+    // blueutil). Not every IOBluetoothDevice responds to it, so the caller
+    // must be able to tell "not supported" apart from "failed"
+    canUnpair(device) {
+        try {
+            return device.instance.respondsToSelector("remove") === true
+        } catch (e) {
+            log.debug(`could not check the "remove" selector: ${e}`)
+            return false
+        }
+    }
+
+    // Returns "ok" when the device is gone from the paired list, "unsupported"
+    // when the private selector is unavailable and "failed" when the call was
+    // accepted but the device is still paired. Like every other mutating call
+    // since macOS 26 this is asynchronous, so the result is verified.
+    unpairDevice(device) {
+        if (!this.canUnpair(device)) {
+            return "unsupported"
+        }
+
+        let addressKey = this._normalizeAddress(
+            ObjC.unwrap(device.instance.addressString))
+
+        try {
+            // Zero-argument selector invoked by plain property access, the same
+            // way closeConnection/openConnection are dispatched on this bridge
+            device.instance.remove
+        } catch (e) {
+            log.debug(`remove failed with "${e}"`)
+            return "failed"
+        }
+
+        let stillPaired = () => this.getPairedDevicesObjs().some(candidate => {
+            if (addressKey !== null) {
+                return this._normalizeAddress(
+                    ObjC.unwrap(candidate.addressString)) === addressKey
+            }
+            return ObjC.unwrap(candidate.nameOrAddress) === device.name
+        })
+
+        return waitFor(() => !stillPaired(), 3) ? "ok" : "failed"
+    }
+
 }
 
 const DEFAULT_DEVICE_TYPE = "bluetooth"
@@ -994,6 +1038,15 @@ class ListBtDevicesCommand extends WorkflowBase {
                 subtitleParts.push(device.address)
             }
 
+            // The ⌃ modifier routes to the unpair confirmation. Only offer it
+            // for devices that expose the private `remove` selector; for the
+            // rest mark the modifier invalid so ⌃⏎ does nothing instead of
+            // running into a dead end. Checking the selector is a cheap
+            // in-process ObjC runtime call, no I/O.
+            let mods = mgr.canUnpair(device)
+                ? { "ctrl": { "arg": device.name, "subtitle": `Unpair ${device.name}` } }
+                : { "ctrl": { "valid": false, "subtitle": "Unpair is not supported for this device" } }
+
             results.push({
                 "uid": device.name,
                 "title": device.name,
@@ -1002,6 +1055,7 @@ class ListBtDevicesCommand extends WorkflowBase {
                     "path": device.icon
                 },
                 "arg": device.name,
+                "mods": mods,
                 })
         })
         return this.returnResult(results, LIST_RERUN_SECONDS)
@@ -1095,6 +1149,131 @@ class ToggleConnectionCommand extends WorkflowBase {
         }
 
         return
+    }
+}
+
+// First step of the unpair flow: the list item's ⌃ modifier routes here
+// instead of the toggle action, so the user gets an explicit confirmation
+// before the destructive call. Confirming sends the device name on to
+// UnpairDeviceCommand.
+class UnpairConfirmCommand extends WorkflowBase {
+    run() {
+        log.debug("running unpair confirmation command")
+        let mgr = new BtManager(this.currentApp, this.doShellScript.bind(this))
+        if (!mgr.hasBluetoothPermission()) {
+            log.error("bluetooth permission is missing for the app hosting this workflow (usually Alfred). See workflow README")
+            return this.returnPermissionError()
+        }
+
+        let deviceName = this.args.at(1)
+        if (deviceName === undefined) {
+            log.error("missing required parameter \"deviceName\"")
+            return this.returnErr(
+                "Could not unpair the selected device",
+                "No device name was provided"
+            )
+        }
+
+        let device = mgr.getDeviceByName(deviceName)
+        if (device === null) {
+            log.error(`Could not find device with name "${deviceName}"`)
+            return this.returnErr(
+                `Could not find "${deviceName}"`,
+                "It may have been unpaired or renamed"
+            )
+        }
+
+        let enriched = new DeviceEnricher(this.getWorkflowRoot()).enrich([device])[0]
+
+        return this.returnResult([
+            {
+                "uid": "unpair-confirm",
+                "title": `Unpair ${device.name}`,
+                "subtitle": "Removes the pairing — you will need to pair it again",
+                "icon": {
+                    "path": enriched.icon
+                },
+                "arg": device.name,
+            },
+            {
+                "uid": "unpair-cancel",
+                "title": "Cancel",
+                "subtitle": "Keep the device paired",
+                "valid": false,
+            }
+        ])
+    }
+}
+
+// Second step of the unpair flow: performs the actual removal. The device is
+// identified by name, matching how the toggle command and the list item arg
+// work.
+class UnpairDeviceCommand extends WorkflowBase {
+    run() {
+        log.debug("running unpair command")
+        if (!this.ensureBluetoothPermission()) {
+            return
+        }
+
+        let mgr = new BtManager(this.currentApp, this.doShellScript.bind(this))
+
+        if (!mgr.isBluetoothOn()) {
+            log.error("cannot unpair while bluetooth is off")
+            this.notify(
+                "Turn Bluetooth on to unpair a device",
+                {withTitle: "Blueman", subtitle: "Bluetooth is off"},
+                true
+            )
+            return
+        }
+
+        let deviceName = this.args.at(1)
+        if (deviceName === undefined) {
+            log.error("missing required parameter \"deviceName\"")
+            this.notify(
+                "Could not unpair the selected device: no device name was provided",
+                {withTitle: "Blueman", subtitle: "Invalid arguments"},
+                true
+            )
+            return
+        }
+
+        let device = mgr.getDeviceByName(deviceName)
+        if (device === null) {
+            log.error(`Could not find device with name "${deviceName}"`)
+            this.notify(
+                `Could not find "${deviceName}". It may have been unpaired or renamed.`,
+                {withTitle: "Blueman", subtitle: "Device not found"},
+                true
+            )
+            return
+        }
+
+        if (!mgr.canUnpair(device)) {
+            log.error(`Device "${deviceName}" does not support unpairing`)
+            this.notify(
+                `Cannot unpair ${deviceName}: this device does not support removal on this macOS version`,
+                {withTitle: "Blueman", subtitle: "Not supported for this device"},
+                true
+            )
+            return
+        }
+
+        let result = mgr.unpairDevice(device)
+        if (result === "ok") {
+            log.debug(`Successfully unpaired "${deviceName}"`)
+            this.notify(`Unpaired ${deviceName}`,
+                {withTitle: "Blueman", subtitle: "Unpaired"}
+            )
+            return
+        }
+
+        log.error(`Could not unpair device "${deviceName}" (${result})`)
+        this.notify(
+            `Could not unpair ${deviceName}. See workflow README for details`,
+            {withTitle: "Blueman", subtitle: "Error unpairing"},
+            true
+        )
     }
 }
 
@@ -1334,7 +1513,9 @@ const possibleCommands = {
     "toggle": ToggleConnectionCommand,
     "toggle-power": TogglePowerCommand,
     "turn-on": TurnBtOnCommand,
-    "turn-off": TurnBtOffCommand
+    "turn-off": TurnBtOffCommand,
+    "unpair": UnpairDeviceCommand,
+    "unpair-confirm": UnpairConfirmCommand
 }
 
 function run() {

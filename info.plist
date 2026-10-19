@@ -128,6 +128,16 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>4842229E-0BF7-462A-B9DB-0D1DBC16323B</string>
+				<key>modifiers</key>
+				<integer>262144</integer>
+				<key>modifiersubtext</key>
+				<string>⌃: Unpair device</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>3CC9121C-D758-4CF9-95F1-3B51528B0BC9</key>
 		<array>
@@ -171,6 +181,21 @@
 			</dict>
 		</array>
 		<key>D14BC437-BCD4-4BB6-BAA9-114CA20A1C79</key>
+		<array/>
+		<key>4842229E-0BF7-462A-B9DB-0D1DBC16323B</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>ED82FB6E-0C7A-4EA3-94B0-D6758903D9C3</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>ED82FB6E-0C7A-4EA3-94B0-D6758903D9C3</key>
 		<array/>
 	</dict>
 	<key>createdby</key>
@@ -652,12 +677,85 @@ echo -n $query
 			<key>version</key>
 			<integer>1</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>alfredfiltersresults</key>
+				<false/>
+				<key>alfredfiltersresultsmatchmode</key>
+				<integer>0</integer>
+				<key>argumenttreatemptyqueryasnil</key>
+				<true/>
+				<key>argumenttrimmode</key>
+				<integer>0</integer>
+				<key>argumenttype</key>
+				<integer>1</integer>
+				<key>escaping</key>
+				<integer>68</integer>
+				<key>keyword</key>
+				<string></string>
+				<key>queuedelaycustom</key>
+				<integer>3</integer>
+				<key>queuedelayimmediatelyinitially</key>
+				<true/>
+				<key>queuedelaymode</key>
+				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
+				<key>runningsubtext</key>
+				<string></string>
+				<key>script</key>
+				<string>/usr/bin/osascript -l JavaScript ./src/bt_manager.jxa unpair-confirm "$1"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>subtext</key>
+				<string></string>
+				<key>title</key>
+				<string>Unpair Bluetooth Device</string>
+				<key>type</key>
+				<integer>0</integer>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>4842229E-0BF7-462A-B9DB-0D1DBC16323B</string>
+			<key>version</key>
+			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>/usr/bin/osascript -l JavaScript ./src/bt_manager.jxa unpair "$1"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>ED82FB6E-0C7A-4EA3-94B0-D6758903D9C3</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>This workflow enables you to manage your Bluetooth device connections and Bluetooth state directly from Alfred. It offers the following functionalities:
 
 * Displays a list of all paired devices along with their connection status (connected or disconnected).
 * Connects or disconnects from a paired Bluetooth device.
+* Unpairs a paired device (hold ⌃ and press ⏎ on a device in the list).
 * Turns Bluetooth on or off for your device, or toggles it with btt.
 * Copies a diagnostics report (btdiag) for issue reports.
 
@@ -795,6 +893,24 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<real>310</real>
 			<key>ypos</key>
 			<real>1080</real>
+		</dict>
+		<key>4842229E-0BF7-462A-B9DB-0D1DBC16323B</key>
+		<dict>
+			<key>note</key>
+			<string>Confirm unpairing a device (reached with ⌃ on the list)</string>
+			<key>xpos</key>
+			<real>670</real>
+			<key>ypos</key>
+			<real>260</real>
+		</dict>
+		<key>ED82FB6E-0C7A-4EA3-94B0-D6758903D9C3</key>
+		<dict>
+			<key>note</key>
+			<string>Unpair the selected device</string>
+			<key>xpos</key>
+			<real>910</real>
+			<key>ypos</key>
+			<real>260</real>
 		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>

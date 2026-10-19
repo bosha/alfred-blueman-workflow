@@ -2,15 +2,15 @@
 
 This workflow enables you to manage your Bluetooth device connections and Bluetooth state directly from Alfred. It offers the following functionalities:
 
-* Displays a list of all paired devices with type-specific icons, connection status (connected or disconnected) and battery level when the device reports it.
-* Connects or disconnects from a paired Bluetooth device.
-* Turns Bluetooth on or off for your device.
+- Displays a list of all paired devices with type-specific icons, connection status (connected or disconnected) and battery level when the device reports it.
+- Connects or disconnects from a paired Bluetooth device.
+- Turns Bluetooth on or off for your device.
 
 Compared to other workflows such as [alfred_bluetooth_controller](https://github.com/vegardinho/alfred_bluetooth_controller/), this one:
 
-* Utilizes only built-in macOS tools: JavaScript for Automation (JXA) plus `system_profiler` for Bluetooth LE device type detection. No third-party dependencies, additional interpreters or external libraries.
-* Does not require third-party external programs like 'blueutil'.
-* Leverages native JXA bridges and MacOS APIs. The built-in `system_profiler` is invoked only when the device list contains LE devices.
+- Utilizes only built-in macOS tools: JavaScript for Automation (JXA) plus `system_profiler` for Bluetooth LE device type detection. No third-party dependencies, additional interpreters or external libraries.
+- Does not require third-party external programs like 'blueutil'.
+- Leverages native JXA bridges and MacOS APIs. The built-in `system_profiler` is invoked only when the device list contains LE devices.
 
 ## Compatibility
 
@@ -19,6 +19,7 @@ I initially developed this workflow for Alfred 4 and it should work seamlessly w
 Regarding MacOS version and devices: This workflow functions perfectly on my MacBook Air (M1 chip), the latest MacOS versions, and should operate without issue on any M-based Mac. Compatibility with older non-M chips is unverified. Feel free to report bugs or submit pull requests.
 
 ## Screenshots
+
 ![List bluetooth devices](assets/readme/screenshot_list.png)
 ![Filter bluetooth devices by name](assets/readme/screenshot_list_filter.png)
 ![Turn bluetooth on](assets/readme/screenshot_turn_on.png)
@@ -48,11 +49,11 @@ make build-dev DEV_WORKFLOW="/path/to/user.workflow..."
 
 ## Commands
 
-* **btl**: Displays a list of all paired Bluetooth devices and their connection status. The keyword is configurable in the workflow settings.
-* **bton**: Turns on Bluetooth on your device.
-* **btoff**: Turns off Bluetooth on your device.
-* **btt**: Toggles Bluetooth on or off.
-* **btdiag**: Copies a diagnostics report for issue reports. Hold Option (`⌥`) to copy a redacted version without device names.
+- **btl**: Displays a list of all paired Bluetooth devices and their connection status. The keyword is configurable in the workflow settings. Hold `⌃` (Control) and press `⏎` on a device to unpair it (**experimental**).
+- **bton**: Turns on Bluetooth on your device.
+- **btoff**: Turns off Bluetooth on your device.
+- **btt**: Toggles Bluetooth on or off.
+- **btdiag**: Copies a diagnostics report for issue reports. Hold Option (`⌥`) to copy a redacted version without device names.
 
 ### External trigger
 
@@ -94,24 +95,34 @@ When the permission is missing the workflow detects it and points you to these s
 
 Disconnecting works for devices connected over Bluetooth Classic — most keyboards, trackpads, mice, headphones and speakers.
 
-It does not work for Bluetooth LE devices, for example the Logitech MX Master 3S or Keychron K3 Max (shown as `HID BLE` in System Information). Such devices are connected and kept connected by the system's HID stack, and there is no public API for a third-party app to drop that link: [`IOBluetoothDevice.closeConnection()`](https://developer.apple.com/documentation/iobluetooth/iobluetoothdevice/closeconnection()) only closes Classic baseband connections, while [`CBCentralManager.cancelPeripheralConnection()`](<https://developer.apple.com/documentation/corebluetooth/cbcentralmanager/cancelperipheralconnection(_:)>) only cancels the app's own local connection — Apple notes that the physical link may stay up because other apps are connected.
+It does not work for Bluetooth LE devices, for example the Logitech MX Master 3S or Keychron K3 Max (shown as `HID BLE` in System Information). Such devices are connected and kept connected by the system's HID stack, and there is no public API for a third-party app to drop that link: [`IOBluetoothDevice.closeConnection()`](<https://developer.apple.com/documentation/iobluetooth/iobluetoothdevice/closeconnection()>) only closes Classic baseband connections, while [`CBCentralManager.cancelPeripheralConnection()`](<https://developer.apple.com/documentation/corebluetooth/cbcentralmanager/cancelperipheralconnection(_:)>) only cancels the app's own local connection — Apple notes that the physical link may stay up because other apps are connected.
 
 The same limitation affects other tools: [blueutil #110](https://github.com/toy/blueutil/issues/110) reports the same MX Master 3S being invisible to its Classic-only scan, [#79](https://github.com/toy/blueutil/issues/79) reports a BLE keyboard missing from its device list, and the long-running disconnect thread [#58](https://github.com/toy/blueutil/issues/58) contains the failing Logitech reports. Use Control Center -> Bluetooth -> device -> Disconnect instead.
 
 The workflow detects LE devices and reports that disconnecting them is not supported, instead of failing silently. For Classic devices it verifies that the connection actually dropped and reports an error when it did not.
 
+### Unpairing devices (experimantal)
+
+Hold `⌃` (Control) and press `⏎` on a device in the `btl` list, then confirm. Unpairing removes the device from the system's paired list, so you will have to pair it again to use it.
+
+This is a destructive, best-effort operation:
+
+- It requires Bluetooth to be on and uses the private `IOBluetoothDevice` `remove` selector — the same approach as [blueutil](https://github.com/toy/blueutil), which marks its own `--unpair` as experimental. Not every device responds to it; when it does not, the workflow reports that unpairing is not supported for that device.
+- Because the call is asynchronous, the workflow verifies that the device actually disappeared from the paired list and reports an error when it did not.
+- Bluetooth LE devices (for example the Logitech MX Master 3S or Keychron K3 Max) may not support removal at all. If you cannot unpair a device from the list, use `System Settings -> Bluetooth -> device -> Forget This Device`.
+
 ## Settings
 
 The workflow exposes eight configuration parameters in Alfred (Workflow -> Configure Workflow...):
 
-* **List keyword** — keyword used to open the device list (default `btl`).
-* **On keyword** — keyword used to turn Bluetooth on (default `bton`).
-* **Off keyword** — keyword used to turn Bluetooth off (default `btoff`).
-* **Toggle keyword** — keyword used to toggle Bluetooth on or off (default `btt`).
-* **Sorting** — `Connected first` (default) shows connected devices at the top of the `btl` list, `Alphabetical` sorts devices by name, `Default` keeps the macOS order. The order within each group is preserved.
-* **MAC addresses** — show device addresses in the `btl` list (off by default). When enabled, the list can also be filtered by address; when disabled, only device names are matched.
-* **Notifications** — `On` (default), `Only errors`, or `Off`.
-* **Logging Level** — defaults to `Info`. Useful only for development purposes.
+- **List keyword** — keyword used to open the device list (default `btl`).
+- **On keyword** — keyword used to turn Bluetooth on (default `bton`).
+- **Off keyword** — keyword used to turn Bluetooth off (default `btoff`).
+- **Toggle keyword** — keyword used to toggle Bluetooth on or off (default `btt`).
+- **Sorting** — `Connected first` (default) shows connected devices at the top of the `btl` list, `Alphabetical` sorts devices by name, `Default` keeps the macOS order. The order within each group is preserved.
+- **MAC addresses** — show device addresses in the `btl` list (off by default). When enabled, the list can also be filtered by address; when disabled, only device names are matched.
+- **Notifications** — `On` (default), `Only errors`, or `Off`.
+- **Logging Level** — defaults to `Info`. Useful only for development purposes.
 
 ## Device icons
 
