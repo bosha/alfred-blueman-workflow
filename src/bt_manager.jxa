@@ -8,6 +8,7 @@ ObjC.import("CoreBluetooth")
 // variables). Keep the names here instead of inlining them at call sites.
 const ENV_VARS = {
     ALFRED_VERSION: "alfred_version",
+    FAVORITES: "favorites",
     LIST_KEYWORD: "list_keyword",
     LOG_LEVEL: "log_level",
     NOTIFICATIONS: "notifications",
@@ -25,6 +26,9 @@ const ENV_VARS = {
 const CONFIG_SCHEMA = {
     alfredVersion: {
         env: ENV_VARS.ALFRED_VERSION,
+    },
+    favorites: {
+        env: ENV_VARS.FAVORITES,
     },
     listKeyword: {
         env: ENV_VARS.LIST_KEYWORD,
@@ -788,15 +792,64 @@ class AlphabeticalSorter {
     }
 }
 
+class FavoritesFirstSorter {
+    sort(devices) {
+        return devices.filter(device => device.favorite)
+            .concat(devices.filter(device => !device.favorite))
+    }
+}
+
 const SORTERS = {
     "default": new DefaultSorter(),
     "connected_first": new ConnectedFirstSorter(),
     "alphabetical": new AlphabeticalSorter(),
+    "favorites_first": new FavoritesFirstSorter(),
 }
 const DEFAULT_SORT_ORDER = "connected_first"
 // Alfred re-runs the Script Filter while the list is open, so connection
 // states stay current; seconds between refreshes
 const LIST_RERUN_SECONDS = 2
+
+// Favorites live in the "favorites" workflow configuration item (a textarea,
+// one device name per line) so users can unstar a device by deleting its line
+// in Alfred's Configure Workflow pane. Names are matched case-insensitively
+// after trimming; the stored value keeps the device's canonical name.
+class Favorites {
+    static parse(value) {
+        if (value === null || value === undefined) {
+            return []
+        }
+        return String(value)
+            .split("\n")
+            .map(line => line.trim())
+            .filter(line => line !== "")
+    }
+
+    static normalize(name) {
+        return String(name).trim().toLowerCase()
+    }
+
+    static has(favorites, name) {
+        let key = Favorites.normalize(name)
+        return favorites.some(entry => Favorites.normalize(entry) === key)
+    }
+
+    static add(favorites, name) {
+        if (Favorites.has(favorites, name)) {
+            return favorites
+        }
+        return favorites.concat(String(name).trim())
+    }
+
+    static remove(favorites, name) {
+        let key = Favorites.normalize(name)
+        return favorites.filter(entry => Favorites.normalize(entry) !== key)
+    }
+
+    static serialize(favorites) {
+        return favorites.join("\n")
+    }
+}
 
 class WorkflowError extends Error {
 	constructor(title, subtitle, ...params) {
@@ -1021,6 +1074,12 @@ class ListBtDevicesCommand extends WorkflowBase {
             }
         }
         
+        // Workflow setting: starred devices, one device name per line
+        let favorites = Favorites.parse(this.config.favorites)
+        items.forEach(device => {
+            device.favorite = Favorites.has(favorites, device.name)
+        })
+
         // Workflow setting; unset or unknown falls back to the default order
         let sortOrder = this.config.sortOrder
         let sorter = SORTERS[sortOrder] || SORTERS[DEFAULT_SORT_ORDER]
@@ -1047,13 +1106,19 @@ class ListBtDevicesCommand extends WorkflowBase {
             // rest mark the modifier invalid so ⌃⏎ does nothing instead of
             // running into a dead end. Checking the selector is a cheap
             // in-process ObjC runtime call, no I/O.
-            let mods = mgr.canUnpair(device)
-                ? { "ctrl": { "arg": device.name, "subtitle": `Unpair ${device.name}` } }
-                : { "ctrl": { "valid": false, "subtitle": "Unpair is not supported for this device" } }
+            let mods = {}
+            mods.ctrl = mgr.canUnpair(device)
+                ? { "arg": device.name, "subtitle": `Unpair ${device.name}` }
+                : { "valid": false, "subtitle": "Unpair is not supported for this device" }
+            // The ⌥ modifier toggles the favorite for this device
+            mods.alt = {
+                "arg": device.name,
+                "subtitle": device.favorite ? "Remove from favorites" : "Add to favorites"
+            }
 
             results.push({
                 "uid": device.name,
-                "title": device.name,
+                "title": device.favorite ? `⭐ ${device.name}` : device.name,
                 "subtitle": subtitleParts.join(" · "),
                 "icon": {
                     "path": device.icon
@@ -1278,6 +1343,45 @@ class UnpairDeviceCommand extends WorkflowBase {
             `Could not unpair ${deviceName}. See workflow README for details`,
             {withTitle: "Blueman", subtitle: "Error unpairing"},
             true
+        )
+    }
+}
+
+// Toggles the selected device in the "favorites" workflow configuration
+// variable (one device name per line). No Bluetooth permission gate: favorites
+// are pure configuration, and a name that no longer resolves is still toggled
+// as given.
+class ToggleFavoriteCommand extends WorkflowBase {
+    run() {
+        log.debug("running toggle favorite command")
+
+        let deviceName = this.args.at(1)
+        if (deviceName === undefined) {
+            log.error("missing required parameter \"deviceName\"")
+            this.notify(
+                "Could not update favorites: no device name was provided",
+                {withTitle: "Blueman", subtitle: "Invalid arguments"},
+                true
+            )
+            return
+        }
+
+        let mgr = new BtManager(this.currentApp, this.doShellScript.bind(this))
+        let device = mgr.getDeviceByName(deviceName)
+        let name = device === null ? deviceName : device.name
+
+        let favorites = Favorites.parse(this.config.favorites)
+        let isFavorite = Favorites.has(favorites, name)
+        favorites = isFavorite
+            ? Favorites.remove(favorites, name)
+            : Favorites.add(favorites, name)
+
+        this.setEnvVar(ENV_VARS.FAVORITES, Favorites.serialize(favorites))
+
+        log.debug(`${isFavorite ? "removed" : "added"} "${name}" ${isFavorite ? "from" : "to"} favorites`)
+        this.notify(
+            `${isFavorite ? "Removed" : "Added"} ${name} ${isFavorite ? "from" : "to"} favorites`,
+            {withTitle: "Blueman", subtitle: "Favorites"}
         )
     }
 }
@@ -1515,6 +1619,7 @@ class DiagnosticsCommand extends WorkflowBase {
 const possibleCommands = {
     "list": ListBtDevicesCommand,
     "diagnostics": DiagnosticsCommand,
+    "favorite": ToggleFavoriteCommand,
     "toggle": ToggleConnectionCommand,
     "toggle-power": TogglePowerCommand,
     "turn-on": TurnBtOnCommand,

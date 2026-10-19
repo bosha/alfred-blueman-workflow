@@ -49,7 +49,9 @@ make build-dev DEV_WORKFLOW="/path/to/user.workflow..."
 
 ## Commands
 
-- **btl**: Displays a list of all paired Bluetooth devices and their connection status. The keyword is configurable in the workflow settings. Hold `⌃` (Control) and press `⏎` on a device to unpair it (**experimental**).
+- **btl**: Displays a list of all paired Bluetooth devices and their connection status. The keyword is configurable in the workflow settings.
+  - Hold `⌥` (Option) and press `⏎` to star a favorite.
+  - Hold `⌃` (Control) and press `⏎` to unpair a device (**experimental**).
 - **bton**: Turns on Bluetooth on your device.
 - **btoff**: Turns off Bluetooth on your device.
 - **btt**: Toggles Bluetooth on or off.
@@ -111,15 +113,22 @@ This is a destructive, best-effort operation:
 - Because the call is asynchronous, the workflow verifies that the device actually disappeared from the paired list and reports an error when it did not.
 - Bluetooth LE devices (for example the Logitech MX Master 3S or Keychron K3 Max) may not support removal at all. If you cannot unpair a device from the list, use `System Settings -> Bluetooth -> device -> Forget This Device`.
 
+### Favorites
+
+Hold `⌥` (Option) and press `⏎` on a device in the `btl` list to star or unstar it. Starred devices show a `⭐` next to their name, and the `Favorites first` sorting option brings them to the top.
+
+Favorites are stored in the workflow's **Favorites** configuration field (Workflow -> Configure Workflow...), one device name per line. To unstar a device without using the list, delete its line there.
+
 ## Settings
 
-The workflow exposes eight configuration parameters in Alfred (Workflow -> Configure Workflow...):
+The workflow exposes nine configuration parameters in Alfred (Workflow -> Configure Workflow...):
 
 - **List keyword** — keyword used to open the device list (default `btl`).
 - **On keyword** — keyword used to turn Bluetooth on (default `bton`).
 - **Off keyword** — keyword used to turn Bluetooth off (default `btoff`).
 - **Toggle keyword** — keyword used to toggle Bluetooth on or off (default `btt`).
-- **Sorting** — `Connected first` (default) shows connected devices at the top of the `btl` list, `Alphabetical` sorts devices by name, `Default` keeps the macOS order. The order within each group is preserved.
+- **Favorites** — starred devices, one name per line (see above).
+- **Sorting** — `Favorites first` brings starred devices to the top, `Connected first` (default) shows connected devices at the top of the `btl` list, `Alphabetical` sorts devices by name, `Default` keeps the macOS order. The order within each group is preserved.
 - **MAC addresses** — show device addresses in the `btl` list (off by default). When enabled, the list can also be filtered by address; when disabled, only device names are matched.
 - **Notifications** — `On` (default), `Only errors`, or `Off`.
 - **Logging Level** — defaults to `Info`. Useful only for development purposes.

@@ -138,6 +138,16 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>0F92B8F4-7772-4CE1-A455-C3D22B96FABA</string>
+				<key>modifiers</key>
+				<integer>524288</integer>
+				<key>modifiersubtext</key>
+				<string>⌥: Toggle favorite</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>3CC9121C-D758-4CF9-95F1-3B51528B0BC9</key>
 		<array>
@@ -196,6 +206,8 @@
 			</dict>
 		</array>
 		<key>ED82FB6E-0C7A-4EA3-94B0-D6758903D9C3</key>
+		<array/>
+		<key>0F92B8F4-7772-4CE1-A455-C3D22B96FABA</key>
 		<array/>
 	</dict>
 	<key>createdby</key>
@@ -749,6 +761,29 @@ echo -n $query
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>/usr/bin/osascript -l JavaScript ./src/bt_manager.jxa favorite "$1"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>0F92B8F4-7772-4CE1-A455-C3D22B96FABA</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>This workflow enables you to manage your Bluetooth device connections and Bluetooth state directly from Alfred. It offers the following functionalities:
@@ -756,6 +791,7 @@ echo -n $query
 * Displays a list of all paired devices along with their connection status (connected or disconnected).
 * Connects or disconnects from a paired Bluetooth device.
 * Unpairs a paired device (hold ⌃ and press ⏎ on a device in the list).
+* Stars favorite devices (hold ⌥ and press ⏎) and can sort them first.
 * Turns Bluetooth on or off for your device, or toggles it with btt.
 * Copies a diagnostics report (btdiag) for issue reports.
 
@@ -912,6 +948,15 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<key>ypos</key>
 			<real>260</real>
 		</dict>
+		<key>0F92B8F4-7772-4CE1-A455-C3D22B96FABA</key>
+		<dict>
+			<key>note</key>
+			<string>Toggle favorite (reached with ⌥ on the list)</string>
+			<key>xpos</key>
+			<real>670</real>
+			<key>ypos</key>
+			<real>400</real>
+		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>
 	<array>
@@ -1003,6 +1048,27 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<key>config</key>
 			<dict>
 				<key>default</key>
+				<string></string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+				<key>verticalsize</key>
+				<integer>6</integer>
+			</dict>
+			<key>description</key>
+			<string>Starred devices, one per line. Press ⌥⏎ on a device in the list to toggle, or delete a line here to unstar it.</string>
+			<key>label</key>
+			<string>Favorites</string>
+			<key>type</key>
+			<string>textarea</string>
+			<key>variable</key>
+			<string>favorites</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
 				<string>info</string>
 				<key>pairs</key>
 				<array>
@@ -1036,6 +1102,10 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 				<string>connected_first</string>
 				<key>pairs</key>
 				<array>
+					<array>
+						<string>Favorites first</string>
+						<string>favorites_first</string>
+					</array>
 					<array>
 						<string>Connected first</string>
 						<string>connected_first</string>
