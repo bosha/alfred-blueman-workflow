@@ -144,6 +144,34 @@
 		</array>
 		<key>78526B29-80D7-4FC7-8AA8-3BE2C44B2D39</key>
 		<array/>
+		<key>A84091A1-BDBF-472D-80C4-5AD2C2F3BF60</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>D14BC437-BCD4-4BB6-BAA9-114CA20A1C79</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>244F6CD2-31AD-4119-9D95-6458CE2664BE</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>D14BC437-BCD4-4BB6-BAA9-114CA20A1C79</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>D14BC437-BCD4-4BB6-BAA9-114CA20A1C79</key>
+		<array/>
 	</dict>
 	<key>createdby</key>
 	<string>Bosha</string>
@@ -218,7 +246,7 @@
 				<key>escaping</key>
 				<integer>68</integer>
 				<key>keyword</key>
-				<string>btl</string>
+				<string>{var:list_keyword}</string>
 				<key>queuedelaycustom</key>
 				<integer>3</integer>
 				<key>queuedelayimmediatelyinitially</key>
@@ -565,13 +593,72 @@ echo -n $query
 			<key>version</key>
 			<integer>3</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>2</integer>
+				<key>keyword</key>
+				<string>btt</string>
+				<key>subtext</key>
+				<string>Toggle Bluetooth on or off</string>
+				<key>text</key>
+				<string>Toggle Bluetooth</string>
+				<key>withspace</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>A84091A1-BDBF-472D-80C4-5AD2C2F3BF60</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>/usr/bin/osascript -l JavaScript ./src/bt_manager.jxa toggle-power</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>D14BC437-BCD4-4BB6-BAA9-114CA20A1C79</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>availableviaurlhandler</key>
+				<true/>
+				<key>triggerid</key>
+				<string>toggle-power</string>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.trigger.external</string>
+			<key>uid</key>
+			<string>244F6CD2-31AD-4119-9D95-6458CE2664BE</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>This workflow enables you to manage your Bluetooth device connections and Bluetooth state directly from Alfred. It offers the following functionalities:
 
 * Displays a list of all paired devices along with their connection status (connected or disconnected).
 * Connects or disconnects from a paired Bluetooth device.
-* Turns Bluetooth on or off for your device.
+* Turns Bluetooth on or off for your device, or toggles it with btt.
 * Copies a diagnostics report (btdiag) for issue reports.
 
 For details see workflow github page - https://github.com/bosha/alfred-blueman-workflow</string>
@@ -682,9 +769,57 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<key>ypos</key>
 			<real>900</real>
 		</dict>
+		<key>A84091A1-BDBF-472D-80C4-5AD2C2F3BF60</key>
+		<dict>
+			<key>note</key>
+			<string>Toggle Bluetooth on/off</string>
+			<key>xpos</key>
+			<real>30</real>
+			<key>ypos</key>
+			<real>1080</real>
+		</dict>
+		<key>244F6CD2-31AD-4119-9D95-6458CE2664BE</key>
+		<dict>
+			<key>note</key>
+			<string>External trigger: toggle-power</string>
+			<key>xpos</key>
+			<real>30</real>
+			<key>ypos</key>
+			<real>1170</real>
+		</dict>
+		<key>D14BC437-BCD4-4BB6-BAA9-114CA20A1C79</key>
+		<dict>
+			<key>note</key>
+			<string>Toggle host bluetooth adapter</string>
+			<key>xpos</key>
+			<real>310</real>
+			<key>ypos</key>
+			<real>1080</real>
+		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>
 	<array>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>btl</string>
+				<key>placeholder</key>
+				<string></string>
+				<key>required</key>
+				<true/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Keyword used to open the Bluetooth device list</string>
+			<key>label</key>
+			<string>List keyword</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>list_keyword</string>
+		</dict>
 		<dict>
 			<key>config</key>
 			<dict>

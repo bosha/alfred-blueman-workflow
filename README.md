@@ -34,10 +34,25 @@ Regarding MacOS version and devices: This workflow functions perfectly on my Mac
 
 ## Commands
 
-* **btl**: Displays a list of all paired Bluetooth devices and their connection status.
+* **btl**: Displays a list of all paired Bluetooth devices and their connection status. The keyword is configurable in the workflow settings.
 * **bton**: Turns on Bluetooth on your device.
 * **btoff**: Turns off Bluetooth on your device.
+* **btt**: Toggles Bluetooth on or off.
 * **btdiag**: Copies a diagnostics report for issue reports. Hold Option (`⌥`) to copy a redacted version without device names.
+
+### External trigger
+
+`toggle-power` toggles Bluetooth and can be called from other apps or workflows:
+
+```shell
+open -b "com.runningwithcrayons.Alfred" "alfred://runtrigger/com.bosha.alfred.blueman/toggle-power"
+```
+
+or from AppleScript:
+
+```applescript
+tell application "Alfred 5" to run trigger "toggle-power" in workflow "com.bosha.alfred.blueman"
+```
 
 ## Troubleshooting
 
@@ -73,8 +88,9 @@ The workflow detects LE devices and reports that disconnecting them is not suppo
 
 ## Settings
 
-The workflow exposes four configuration parameters in Alfred (Workflow -> Configure Workflow...):
+The workflow exposes five configuration parameters in Alfred (Workflow -> Configure Workflow...):
 
+* **List keyword** — keyword used to open the device list (default `btl`).
 * **Sorting** — `Connected first` (default) shows connected devices at the top of the `btl` list, `Alphabetical` sorts devices by name, `Default` keeps the macOS order. The order within each group is preserved.
 * **MAC addresses** — show device addresses in the `btl` list (off by default). When enabled, the list can also be filtered by address; when disabled, only device names are matched.
 * **Notifications** — `On` (default), `Only errors`, or `Off`.

@@ -8,6 +8,7 @@ ObjC.import("CoreBluetooth")
 // variables). Keep the names here instead of inlining them at call sites.
 const ENV_VARS = {
     ALFRED_VERSION: "alfred_version",
+    LIST_KEYWORD: "list_keyword",
     LOG_LEVEL: "log_level",
     NOTIFICATIONS: "notifications",
     SORT_ORDER: "sort_order",
@@ -21,6 +22,10 @@ const ENV_VARS = {
 const CONFIG_SCHEMA = {
     alfredVersion: {
         env: ENV_VARS.ALFRED_VERSION,
+    },
+    listKeyword: {
+        env: ENV_VARS.LIST_KEYWORD,
+        default: "btl",
     },
     logLevel: {
         env: ENV_VARS.LOG_LEVEL,
@@ -706,6 +711,33 @@ const POWER_STATE_LABELS = {
     2: "unknown",
 }
 
+class TogglePowerCommand extends WorkflowBase {
+    run() {
+        log.debug("running command to toggle bluetooth power")
+        if (!this.ensureBluetoothPermission()) {
+            return
+        }
+
+        let mgr = new BtManager()
+        let turnOn = !mgr.isBluetoothOn()
+        log.debug(`turning bluetooth ${turnOn ? "ON" : "OFF"}`)
+
+        if (!(turnOn ? mgr.turnOnBluetooth() : mgr.turnOffBluetooth())) {
+            let target = turnOn ? "on" : "off"
+            log.error(`timeout waiting for the bluetooth power state transition to ${target.toUpperCase()}`)
+            this.notify(`Could not turn bluetooth ${target}`,
+                {withTitle: "Blueman", subtitle: "Error"},
+                true
+            )
+            return
+        }
+
+        let msg = `Command to turn bluetooth ${turnOn ? "ON" : "OFF"} was successfully sent`
+        log.debug(msg)
+        this.notify(msg, {withTitle: "Blueman", subtitle: "Success"})
+    }
+}
+
 class DiagnosticsCommand extends WorkflowBase {
     run() {
         log.debug("running diagnostics command")
@@ -801,7 +833,8 @@ class DiagnosticsCommand extends WorkflowBase {
             `Bluetooth permission: ${this.permissionLabel(info)}`,
             `Bluetooth power: ${this.powerLabel(info)}`,
             `Paired devices: ${this.deviceCountLabel(info)}`,
-            `Settings: sort_order=${this.config.sortOrder || DEFAULT_SORT_ORDER}, `
+            `Settings: list_keyword=${this.config.listKeyword}, `
+                + `sort_order=${this.config.sortOrder || DEFAULT_SORT_ORDER}, `
                 + `show_mac_addresses=${this.config.showMacAddresses ? "on" : "off"}, `
                 + `notifications=${this.config.notifications}`,
         ]
@@ -834,6 +867,7 @@ const possibleCommands = {
     "list": ListBtDevicesCommand,
     "diagnostics": DiagnosticsCommand,
     "toggle": ToggleConnectionCommand,
+    "toggle-power": TogglePowerCommand,
     "turn-on": TurnBtOnCommand,
     "turn-off": TurnBtOffCommand
 }
