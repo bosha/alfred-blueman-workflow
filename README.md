@@ -38,13 +38,13 @@ Regarding MacOS version and devices: This workflow functions perfectly on my Mac
 To copy the runtime script, workflow metadata and icons into the installed Alfred workflow for manual testing:
 
 ```shell
-make build-dev
+make dev-sync
 ```
 
 The target finds the installed workflow from Alfred's current preferences by bundle ID. If the workflow is installed elsewhere, override the destination:
 
 ```shell
-make build-dev DEV_WORKFLOW="/path/to/user.workflow..."
+make dev-sync DEV_WORKFLOW="/path/to/user.workflow..."
 ```
 
 ## Commands

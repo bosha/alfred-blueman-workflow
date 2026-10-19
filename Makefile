@@ -7,11 +7,11 @@ DEV_WORKFLOW ?= $(shell for p in "$(ALFRED_PREFS)"/workflows/user.workflow.*; do
 	if [ "$$id" = "$(WORKFLOW_BUNDLE_ID)" ]; then echo "$$p"; break; fi; \
 done)
 
-.PHONY: build-dev
+.PHONY: dev-sync
 
 # Older workflow objects still call ./bt_manager.jxa; keep that entry point in
 # sync when the installed workflow already has one.
-build-dev:
+dev-sync:
 	@test -n "$(DEV_WORKFLOW)" || { \
 		echo "error: could not find the installed workflow" >&2; \
 		echo "set DEV_WORKFLOW to the installed workflow directory" >&2; \
