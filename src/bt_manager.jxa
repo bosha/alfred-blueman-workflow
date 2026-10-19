@@ -140,7 +140,13 @@ class SimpleLogger {
 }
 
 class BtManager {
-    constructor() {
+    constructor(currentApp, doShellScript) {
+        if (!currentApp || !doShellScript) {
+            log.error("BtManager requires currentApp and doShellScript")
+            throw new Error("BtManager requires currentApp and doShellScript")
+        }
+        this.currentApp = currentApp
+        this.doShellScript = doShellScript
         this.controller = null
     }
 
@@ -150,32 +156,161 @@ class BtManager {
 
     }
 
-    getPairedDevices() {
+    _normalizeAddress(address) {
+        if (!address) {
+            return null
+        }
+        let normalized = String(address).replace(/[^0-9a-f]/gi, "").toLowerCase()
+        return normalized === "" ? null : normalized
+    }
+
+    // Bluetooth vendor/product IDs are shown as hexadecimal strings by
+    // `system_profiler` and as decimal numbers by IOBluetooth. Normalize both
+    // to the four-digit lowercase form used by assets/icons/map.json.
+    _normalizeHex4(value) {
+        if (value === null || value === undefined || value === "") {
+            return null
+        }
+
+        let number
+        if (typeof value === "number") {
+            number = value
+        } else {
+            let text = String(value).trim().toLowerCase()
+            if (text.startsWith("0x")) {
+                text = text.slice(2)
+            }
+            if (!/^[0-9a-f]+$/.test(text)) {
+                return null
+            }
+            number = parseInt(text, 16)
+        }
+
+        if (!Number.isFinite(number) || number === 0) {
+            return null
+        }
+        return number.toString(16).padStart(4, "0")
+    }
+
+    getPairedDevices({ short = false } = {}) {
         let items = this.getPairedDevicesObjs()
 
-        return Array.from(items, device => {
-            let classOfDevice = ObjC.unwrap(device.classOfDevice)
+        let devices = Array.from(items, device => {
+            let name = ObjC.unwrap(device.nameOrAddress)
+            let connected = ObjC.unwrap(device.isConnected)
+            // Since macOS 26 LE devices are served by the CoreBluetooth shim
+            // and report no Class of Device; Classic devices always do
+            let isBle = ObjC.unwrap(device.classOfDevice) === 0
+
+            // Connect/disconnect only needs the identity and link state.
+            // Skip battery reads, IDs, class-of-device values and details.
+            if (short) {
+                return {
+                    "name": name,
+                    "connected": connected,
+                    "isBle": isBle,
+                    "instance": device
+                }
+            }
+
+            let address = ObjC.unwrap(device.addressString)
             return {
-                "name": ObjC.unwrap(device.nameOrAddress),
-                "connected": ObjC.unwrap(device.isConnected),
-                "address": ObjC.unwrap(device.addressString),
+                "name": name,
+                "connected": connected,
+                "address": address,
+                "addressKey": this._normalizeAddress(address),
                 "battery": this.getBatteryLabel(device),
-                // Since macOS 26 LE devices are served by the CoreBluetooth
-                // shim and report no Class of Device; Classic devices always do
-                "isBle": classOfDevice === 0,
+                "isBle": isBle,
+                "minorType": null,
+                "vendorID": this._normalizeHex4(ObjC.unwrap(device.vendorID)),
+                "productID": this._normalizeHex4(ObjC.unwrap(device.productID)),
+                "deviceClassMajor": ObjC.unwrap(device.deviceClassMajor),
+                "deviceClassMinor": ObjC.unwrap(device.deviceClassMinor),
                 "instance": device
             }
         })
+
+        if (short || !devices.some(device => device.isBle)) {
+            return devices
+        }
+
+        // Full devices carry all known facts, including the system_profiler
+        // details that are only available for LE devices.
+        let detailsByAddress = this._getBluetoothDeviceDetails()
+        devices.forEach(device => {
+            let details = detailsByAddress[device.addressKey] || {}
+            device.minorType = details.minorType || null
+            device.vendorID = device.vendorID || details.vendorID || null
+            device.productID = device.productID || details.productID || null
+        })
+
+        return devices
     }
 
     getDeviceByName(deviceName) {
-        let devices = this.getPairedDevices()
-		for (let device of devices) { 
-			if (device.name === deviceName) {
-				return device
-			}
-		}
+        let devices = this.getPairedDevices({ short: true })
+        for (let device of devices) {
+            if (device.name === deviceName) {
+                return device
+            }
+        }
         return null
+    }
+
+    // `system_profiler` is the only source that exposes a usable device type
+    // for disconnected LE devices. It is only called when the list contains at
+    // least one LE device.
+    _getBluetoothDeviceDetails() {
+        let output = null
+        try {
+            output = this.doShellScript(
+                "/usr/sbin/system_profiler SPBluetoothDataType -json")
+        } catch (e) {
+            log.debug(`could not read bluetooth device details: ${e}`)
+            return {}
+        }
+
+        try {
+            let report = JSON.parse(output)
+            let sections = report.SPBluetoothDataType || []
+            if (!Array.isArray(sections)) {
+                sections = [sections]
+            }
+
+            let result = {}
+            sections.forEach(section => {
+                ["device_connected", "device_not_connected"].forEach(sectionKey => {
+                    let entries = section[sectionKey] || []
+                    if (!Array.isArray(entries)) {
+                        entries = [entries]
+                    }
+                    entries.forEach(entry => {
+                        let names = Object.keys(entry)
+                        if (names.length === 0) {
+                            return
+                        }
+                        let details = entry[names[0]]
+                        if (!details || !details.device_address) {
+                            return
+                        }
+                        let addressKey = this._normalizeAddress(details.device_address)
+                        if (addressKey === null) {
+                            return
+                        }
+                        result[addressKey] = {
+                            minorType: details.device_minorType || null,
+                            vendorID: this._normalizeHex4(details.device_vendorID),
+                            productID: this._normalizeHex4(details.device_productID),
+                        }
+                    })
+                })
+            })
+            log.debug(`read details for '${Object.keys(result).length}' bluetooth devices`)
+            return result
+        } catch (e) {
+            log.debug(`could not parse bluetooth device details: ${e}`)
+            return {}
+        }
     }
 
     _getHostController() {
@@ -299,6 +434,259 @@ class BtManager {
 
 }
 
+const DEFAULT_DEVICE_TYPE = "bluetooth"
+const DEVICE_ICON_DIR = "./assets/icons"
+// Specific-device overrides live next to the icons so adding support for a new
+// device only requires a mapping entry and a PNG, no code changes.
+const DEVICE_ICON_MAP_PATH = "assets/icons/map.json"
+
+// `system_profiler` reports human-readable minor types for Classic and LE
+// devices. Keep the patterns ordered: "Headphones" contains "phone", and
+// "Magic Trackpad" contains "trackpad".
+const DEVICE_TYPE_BY_MINOR_TYPE = [
+    [/keyboard/i, "keyboard"],
+    [/trackpad|touchpad/i, "trackpad"],
+    [/mouse|pointing/i, "mouse"],
+    [/headphone|headset|earphone|airpod|buds/i, "headphones"],
+    [/speaker|hifi/i, "speaker"],
+    [/gamepad|game controller|joystick|controller/i, "gamecontroller"],
+    [/watch/i, "watch"],
+    [/tablet|ipad/i, "tablet"],
+    [/iphone|phone|mobile/i, "phone"],
+    [/laptop|computer|desktop/i, "computer"],
+]
+
+const DEVICE_TYPE_BY_NAME = [
+    [/keyboard|keychron/i, "keyboard"],
+    [/trackpad|touchpad/i, "trackpad"],
+    [/mouse|mx master/i, "mouse"],
+    [/airpod|headphone|headset|earbud|buds/i, "headphones"],
+    [/speaker|homepod/i, "speaker"],
+    [/gamepad|game controller|controller/i, "gamecontroller"],
+    [/watch/i, "watch"],
+    [/ipad|tablet/i, "tablet"],
+    [/iphone|phone/i, "phone"],
+    [/laptop|macbook|computer/i, "computer"],
+]
+
+const CLASS_OF_DEVICE_MAJOR = {
+    COMPUTER: 1,
+    PHONE: 2,
+    AUDIO_VIDEO: 4,
+    PERIPHERAL: 5,
+    WEARABLE: 7,
+    TOY: 8,
+}
+
+const CLASS_OF_DEVICE_MINOR = {
+    AUDIO_VIDEO: {
+        HEADSET: 1,
+        HANDS_FREE: 2,
+        LOUDSPEAKER: 5,
+        HEADPHONES: 6,
+        PORTABLE_AUDIO: 7,
+        HIFI: 10,
+        GAMING: 18,
+    },
+    PERIPHERAL: {
+        KEYBOARD: 16,
+        MOUSE: 32,
+        JOYSTICK: 33,
+        GAMEPAD: 34,
+        TRACKPAD: 37,
+        COMBO_KEYBOARD_POINTING: 48,
+    },
+}
+
+// Output-only device enrichment: adds the type and icon path needed by the
+// list. BtManager deliberately knows nothing about workflow files or icons.
+class DeviceEnricher {
+    constructor(workflowRoot = null) {
+        this.workflowRoot = workflowRoot
+        this.iconMap = null
+    }
+
+    enrich(devices) {
+        devices.forEach(device => {
+            device.type = this.getDeviceType(device)
+            device.icon = this.getIconPath(device.type)
+        })
+        return devices
+    }
+
+    getDeviceType(device) {
+        return this.getMappedType(device.vendorID, device.productID)
+            || this.typeFromMinorType(device.minorType)
+            || this.typeFromClassOfDevice(
+                device.deviceClassMajor, device.deviceClassMinor)
+            || this.typeFromName(device.name)
+            || DEFAULT_DEVICE_TYPE
+    }
+
+    // Device-specific overrides are data-driven: assets/icons/map.json maps
+    // `vendor_id:product_id` (or `vendor_id:*`) to an icon name. Adding a new
+    // device icon therefore only requires a mapping entry and a PNG.
+    getMappedType(vendorID, productID) {
+        if (!vendorID) {
+            return null
+        }
+
+        let map = this.getIconMap()
+        if (productID && map[`${vendorID}:${productID}`]) {
+            return map[`${vendorID}:${productID}`]
+        }
+        return map[`${vendorID}:*`] || null
+    }
+
+    getIconMap() {
+        if (this.iconMap !== null) {
+            return this.iconMap
+        }
+
+        this.iconMap = {}
+        if (!this.workflowRoot) {
+            log.debug("workflow root is not available for the device icon map")
+            return this.iconMap
+        }
+
+        try {
+            let path = `${this.workflowRoot}/${DEVICE_ICON_MAP_PATH}`
+            let data = $.NSData.dataWithContentsOfFile(path)
+            if (data === null || data === undefined) {
+                log.debug(`device icon map not found: ${path}`)
+                return this.iconMap
+            }
+
+            let text = ObjC.unwrap(
+                $.NSString.alloc.initWithDataEncoding(data, $.NSUTF8StringEncoding))
+            if (!text) {
+                log.debug(`device icon map is not valid UTF-8: ${path}`)
+                return this.iconMap
+            }
+
+            let parsed = JSON.parse(text)
+            if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+                log.debug(`device icon map must be a JSON object: ${path}`)
+                return this.iconMap
+            }
+
+            let map = {}
+            Object.keys(parsed).forEach(key => {
+                let icon = parsed[key]
+                if (!/^[0-9a-f]{4}:(?:[0-9a-f]{4}|\*)$/.test(key)
+                    || typeof icon !== "string"
+                    || !/^[a-z0-9_]+$/.test(icon)) {
+                    log.debug(`ignoring invalid device icon map entry: ${key}`)
+                    return
+                }
+                map[key] = icon
+            })
+            this.iconMap = map
+        } catch (e) {
+            log.debug(`could not load the device icon map: ${e}`)
+        }
+        return this.iconMap
+    }
+
+    getIconPath(type) {
+        let icon = type || DEFAULT_DEVICE_TYPE
+        if (!/^[a-z0-9_]+$/.test(icon)) {
+            icon = DEFAULT_DEVICE_TYPE
+        }
+
+        if (this.workflowRoot) {
+            let absolute = `${this.workflowRoot}/assets/icons/${icon}.png`
+            if (!$.NSFileManager.defaultManager.fileExistsAtPath(absolute)) {
+                log.error(`device icon not found: ${absolute}`)
+                icon = DEFAULT_DEVICE_TYPE
+            }
+        }
+        return `${DEVICE_ICON_DIR}/${icon}.png`
+    }
+
+    typeFromMinorType(minorType) {
+        if (!minorType) {
+            return null
+        }
+        let value = String(minorType)
+        for (let [pattern, type] of DEVICE_TYPE_BY_MINOR_TYPE) {
+            if (pattern.test(value)) {
+                return type
+            }
+        }
+        return null
+    }
+
+    typeFromClassOfDevice(major, minor) {
+        major = Number(major)
+        minor = Number(minor)
+        if (!Number.isFinite(major) || !Number.isFinite(minor)) {
+            return null
+        }
+
+        const MAJOR = CLASS_OF_DEVICE_MAJOR
+        const AUDIO_VIDEO = CLASS_OF_DEVICE_MINOR.AUDIO_VIDEO
+        const PERIPHERAL = CLASS_OF_DEVICE_MINOR.PERIPHERAL
+
+        switch (major) {
+            case MAJOR.COMPUTER:
+                return "computer"
+            case MAJOR.PHONE:
+                return "phone"
+            case MAJOR.AUDIO_VIDEO:
+                if ([
+                    AUDIO_VIDEO.HEADSET,
+                    AUDIO_VIDEO.HANDS_FREE,
+                    AUDIO_VIDEO.HEADPHONES,
+                    AUDIO_VIDEO.PORTABLE_AUDIO,
+                ].includes(minor)) {
+                    return "headphones"
+                }
+                if ([AUDIO_VIDEO.LOUDSPEAKER, AUDIO_VIDEO.HIFI].includes(minor)) {
+                    return "speaker"
+                }
+                if (minor === AUDIO_VIDEO.GAMING) {
+                    return "gamecontroller"
+                }
+                return null
+            case MAJOR.PERIPHERAL:
+                if (minor === PERIPHERAL.KEYBOARD
+                    || minor === PERIPHERAL.COMBO_KEYBOARD_POINTING) {
+                    return "keyboard"
+                }
+                if (minor === PERIPHERAL.MOUSE) {
+                    return "mouse"
+                }
+                if (minor === PERIPHERAL.JOYSTICK || minor === PERIPHERAL.GAMEPAD) {
+                    return "gamecontroller"
+                }
+                if (minor === PERIPHERAL.TRACKPAD) {
+                    return "trackpad"
+                }
+                return null
+            case MAJOR.WEARABLE:
+                return "watch"
+            case MAJOR.TOY:
+                return "gamecontroller"
+            default:
+                return null
+        }
+    }
+
+    typeFromName(name) {
+        if (!name) {
+            return null
+        }
+        let value = String(name)
+        for (let [pattern, type] of DEVICE_TYPE_BY_NAME) {
+            if (pattern.test(value)) {
+                return type
+            }
+        }
+        return null
+    }
+}
+
 // Device list ordering. Sorters are stateless: sort() must not mutate the
 // input and must preserve the original order within groups, so switching
 // modes never reshuffles devices inside a group
@@ -364,13 +752,42 @@ class WorkflowBase {
         return `${version.majorVersion}.${version.minorVersion}.${version.patchVersion}`
     }
 
+    // Resolve the workflow directory from the script path. Device icons are
+    // loaded by JXA itself, so the list command passes this to the enricher.
+    getWorkflowRoot() {
+        let args = ObjC.deepUnwrap($.NSProcessInfo.processInfo.arguments)
+        let script = args[3]
+        if (!script) {
+            return null
+        }
+
+        let scriptPath = script
+        if (!scriptPath.startsWith("/")) {
+            let cwd = ObjC.unwrap($.NSFileManager.defaultManager.currentDirectoryPath)
+            scriptPath = `${cwd}/${scriptPath}`
+        }
+
+        let sourceIndex = scriptPath.lastIndexOf("/src/")
+        if (sourceIndex !== -1) {
+            return scriptPath.substring(0, sourceIndex)
+        }
+
+        let slashIndex = scriptPath.lastIndexOf("/")
+        return slashIndex !== -1 ? scriptPath.substring(0, slashIndex) : null
+    }
+
     openPermissionsSettings(path) {
         $.NSWorkspace.sharedWorkspace.openURL($.NSURL.URLWithString(path))
     }
 
+    doShellScript(command) {
+        this.currentApp.includeStandardAdditions = true
+        return this.currentApp.doShellScript(command)
+    }
+
     shellOutput(command) {
         try {
-            let output = this.currentApp.doShellScript(command)
+            let output = this.doShellScript(command)
             return output.trim() || "unknown"
         } catch (e) {
             log.debug(`could not run '${command}': ${e}`)
@@ -428,7 +845,7 @@ class WorkflowBase {
     // For commands triggered directly (turn on/off/toggle), where there is no
     // Alfred result list to render: notify the user and open the settings pane
     ensureBluetoothPermission() {
-        let mgr = new BtManager()
+        let mgr = new BtManager(this.currentApp, this.doShellScript.bind(this))
         if (mgr.hasBluetoothPermission()) {
             return true
         }
@@ -470,7 +887,7 @@ class WorkflowBase {
 class ListBtDevicesCommand extends WorkflowBase {
     run() {
         log.debug("running list bluetooth devices command")
-        let mgr = new BtManager()
+        let mgr = new BtManager(this.currentApp, this.doShellScript.bind(this))
         if (!mgr.hasBluetoothPermission()) {
             log.error("bluetooth permission is missing for the app hosting this workflow (usually Alfred). See workflow README")
             return this.returnPermissionError()
@@ -532,25 +949,27 @@ class ListBtDevicesCommand extends WorkflowBase {
         log.debug(`sorting devices with order '${sortOrder}'`)
         items = sorter.sort(items)
 
+        // Enrich only the devices that will actually be displayed.
+        items = new DeviceEnricher(this.getWorkflowRoot()).enrich(items)
+
         let results = []
         items.forEach(device => {
-            let subtitle = device.battery || ""
-            if (showAddresses) {
-                subtitle = subtitle === ""
-                    ? device.address
-                    : `${subtitle} (${device.address})`
+            // Type icons replace the old on/off icons, so the connection state
+            // is always part of the subtitle, followed by battery/address.
+            let subtitleParts = [device.connected ? "Connected" : "Disconnected"]
+            if (device.battery) {
+                subtitleParts.push(device.battery)
             }
-
-            if (subtitle === "") {
-                subtitle = device.connected ? "Connected" : "Disconnected"
+            if (showAddresses) {
+                subtitleParts.push(device.address)
             }
 
             results.push({
                 "uid": device.name,
                 "title": device.name,
-                "subtitle": subtitle,
+                "subtitle": subtitleParts.join(" · "),
                 "icon": {
-                    "path": device.connected ? "./assets/on.png" : "./assets/off.png"
+                    "path": device.icon
                 },
                 "arg": device.name,
                 })
@@ -566,7 +985,7 @@ class ToggleConnectionCommand extends WorkflowBase {
             return
         }
 
-        let mgr = new BtManager()
+        let mgr = new BtManager(this.currentApp, this.doShellScript.bind(this))
 
         let deviceName = this.args.at(1)
         if (deviceName === undefined) {
@@ -590,7 +1009,7 @@ class ToggleConnectionCommand extends WorkflowBase {
             return
         }
 
-        log.debug(`Got device: ${JSON.stringify(device)}`)
+        log.debug(`Got device: ${device.name} (connected=${device.connected}, ble=${device.isBle})`)
 
         if (device.connected) {
             if (device.isBle) {
@@ -656,7 +1075,7 @@ class TurnBtOffCommand extends WorkflowBase {
             return
         }
 
-        let mgr = new BtManager()
+        let mgr = new BtManager(this.currentApp, this.doShellScript.bind(this))
 
         if (!mgr.isBluetoothOn()) {
             log.debug("bluetooth already turned off, exiting")
@@ -688,7 +1107,7 @@ class TurnBtOnCommand extends WorkflowBase {
             return
         }
 
-        let mgr = new BtManager()
+        let mgr = new BtManager(this.currentApp, this.doShellScript.bind(this))
 
         if (mgr.isBluetoothOn()) {
             log.debug("bluetooth already turned on, exiting")
@@ -733,7 +1152,7 @@ class TogglePowerCommand extends WorkflowBase {
             return
         }
 
-        let mgr = new BtManager()
+        let mgr = new BtManager(this.currentApp, this.doShellScript.bind(this))
         let turnOn = !mgr.isBluetoothOn()
         log.debug(`turning bluetooth ${turnOn ? "ON" : "OFF"}`)
 
@@ -781,7 +1200,7 @@ class DiagnosticsCommand extends WorkflowBase {
     }
 
     collectInfo() {
-        let mgr = new BtManager()
+        let mgr = new BtManager(this.currentApp, this.doShellScript.bind(this))
         let authorization = mgr.getBluetoothAuthorization()
         let permission = authorization === null || authorization === 3
 

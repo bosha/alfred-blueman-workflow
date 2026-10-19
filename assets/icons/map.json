@@ -1,0 +1,23 @@
+{
+  "004c:0265": "magic_trackpad",
+  "004c:0267": "magic_keyboard",
+  "004c:0269": "magic_mouse",
+  "004c:029a": "magic_keyboard",
+  "004c:2002": "airpods",
+  "004c:200a": "airpods_max",
+  "004c:200e": "airpods_pro",
+  "004c:200f": "airpods",
+  "004c:2013": "airpods",
+  "004c:2014": "airpods_pro",
+  "004c:201b": "airpods",
+  "004c:201f": "airpods_max",
+  "004c:2024": "airpods_pro",
+  "004c:2027": "airpods_pro",
+  "004c:202d": "airpods_max",
+  "046d:b017": "mx_master",
+  "046d:b019": "mx_master",
+  "046d:b023": "mx_master",
+  "046d:b034": "mx_master",
+  "046d:b042": "mx_master",
+  "3434:*": "keychron"
+}

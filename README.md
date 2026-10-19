@@ -2,15 +2,15 @@
 
 This workflow enables you to manage your Bluetooth device connections and Bluetooth state directly from Alfred. It offers the following functionalities:
 
-* Displays a list of all paired devices along with their connection status (connected or disconnected) and battery level when the device reports it.
+* Displays a list of all paired devices with type-specific icons, connection status (connected or disconnected) and battery level when the device reports it.
 * Connects or disconnects from a paired Bluetooth device.
 * Turns Bluetooth on or off for your device.
 
 Compared to other workflows such as [alfred_bluetooth_controller](https://github.com/vegardinho/alfred_bluetooth_controller/), this one:
 
-* Utilizes only JavaScript (JXA - JavaScript for Automations), which is included with every modern MacOS and proven to be stable enough (you all probably remember the pain when apple moved from python2 to python3, right? 😬 ). No need for additional interpreters or external libraries.
-* Does not require any external programs like 'blueutil'.
-* Leverages native JXA bridges and MacOS APIs, resulting in faster performance compared to workflows relying on external programs.
+* Utilizes only built-in macOS tools: JavaScript for Automation (JXA) plus `system_profiler` for Bluetooth LE device type detection. No third-party dependencies, additional interpreters or external libraries.
+* Does not require third-party external programs like 'blueutil'.
+* Leverages native JXA bridges and MacOS APIs. The built-in `system_profiler` is invoked only when the device list contains LE devices.
 
 ## Compatibility
 
@@ -98,3 +98,32 @@ The workflow exposes eight configuration parameters in Alfred (Workflow -> Confi
 * **MAC addresses** — show device addresses in the `btl` list (off by default). When enabled, the list can also be filtered by address; when disabled, only device names are matched.
 * **Notifications** — `On` (default), `Only errors`, or `Off`.
 * **Logging Level** — defaults to `Info`. Useful only for development purposes.
+
+## Device icons
+
+Device rows use type-specific icons for keyboards, mice, trackpads, headphones, speakers, phones, tablets, watches, game controllers and computers. AirPods, Magic Mouse/Keyboard/Trackpad, the Logitech MX Master lineup and Keychron devices have dedicated icons.
+
+Specific-device overrides are data-driven, so adding an icon does not require code changes:
+
+1. Add a 512×512 PNG to `assets/icons/` (transparent background).
+2. Add a mapping entry to `assets/icons/map.json`.
+
+Mapping keys are `vendor_id:product_id` in four-digit lowercase hexadecimal, without `0x`. A `vendor_id:*` entry applies to every product from that vendor. Icon names may contain lowercase letters, digits and underscores.
+
+```json
+{
+  "004c:0269": "magic_mouse",
+  "046d:b034": "mx_master",
+  "3434:*": "keychron"
+}
+```
+
+The value is the icon file name without `.png`. The workflow checks the specific product first, then the vendor wildcard. Device IDs are shown in System Information -> Bluetooth. If no mapping matches, the icon is selected from the device type (Classic Class of Device or `system_profiler` minor type), with a device-name fallback.
+
+To regenerate the bundled icons from SF Symbols, run:
+
+```shell
+xcrun swift tools/generate_icons.swift
+```
+
+Add or change entries in the `specs` array at the top of that script. BLE device types are read from the built-in `system_profiler` only when the list contains LE devices; Classic devices use their Class of Device.
