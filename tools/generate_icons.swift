@@ -10,6 +10,8 @@ import AppKit
 
 let size: CGFloat = 512
 let blue = NSColor(srgbRed: 0.039, green: 0.518, blue: 1.0, alpha: 1.0)
+// Opaque mid-gray so disconnected icons stay visible on light and dark themes.
+let gray = NSColor(srgbRed: 0.557, green: 0.557, blue: 0.576, alpha: 1.0)
 let white = NSColor.white
 
 let cwd = FileManager.default.currentDirectoryPath
@@ -54,6 +56,16 @@ let specs: [Spec] = [
     Spec(name: "keychron", symbol: "keyboard", badge: .letter("K")),
 ]
 
+struct IconVariant {
+    let suffix: String
+    let color: NSColor
+}
+
+let variants: [IconVariant] = [
+    IconVariant(suffix: "", color: blue),
+    IconVariant(suffix: "_off", color: gray),
+]
+
 try! FileManager.default.createDirectory(
     atPath: outputDir, withIntermediateDirectories: true)
 
@@ -78,10 +90,10 @@ func drawCentered(_ image: NSImage, in canvas: NSRect, maxSide: CGFloat, centerY
     image.draw(in: rect, from: .zero, operation: .sourceOver, fraction: 1)
 }
 
-func drawMagicTrackpad() {
+func drawMagicTrackpad(color: NSColor) {
     let rect = NSRect(x: 76, y: 126, width: 360, height: 260)
     let path = NSBezierPath(roundedRect: rect, xRadius: 54, yRadius: 54)
-    blue.setFill()
+    color.setFill()
     path.fill()
 
     guard let image = symbolImage(
@@ -98,13 +110,13 @@ func drawMagicTrackpad() {
         height: height))
 }
 
-func drawBadge(_ badge: Badge, at center: NSPoint, diameter: CGFloat) {
+func drawBadge(_ badge: Badge, at center: NSPoint, diameter: CGFloat, color: NSColor) {
     let rect = NSRect(
         x: center.x - diameter / 2,
         y: center.y - diameter / 2,
         width: diameter,
         height: diameter)
-    blue.setFill()
+    color.setFill()
     NSBezierPath(ovalIn: rect).fill()
 
     switch badge {
@@ -138,55 +150,64 @@ func drawBadge(_ badge: Badge, at center: NSPoint, diameter: CGFloat) {
 }
 
 for spec in specs {
-    guard let rep = NSBitmapImageRep(
-        bitmapDataPlanes: nil,
-        pixelsWide: Int(size),
-        pixelsHigh: Int(size),
-        bitsPerSample: 8,
-        samplesPerPixel: 4,
-        hasAlpha: true,
-        isPlanar: false,
-        colorSpaceName: .deviceRGB,
-        bytesPerRow: 0,
-        bitsPerPixel: 0) else {
-        fatalError("could not create bitmap for \(spec.name)")
-    }
+    for variant in variants {
+        let iconName = "\(spec.name)\(variant.suffix)"
 
-    NSGraphicsContext.saveGraphicsState()
-    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-    NSGraphicsContext.current?.imageInterpolation = .high
-    NSColor.clear.setFill()
-    NSRect(x: 0, y: 0, width: size, height: size).fill(using: .copy)
+        guard let rep = NSBitmapImageRep(
+            bitmapDataPlanes: nil,
+            pixelsWide: Int(size),
+            pixelsHigh: Int(size),
+            bitsPerSample: 8,
+            samplesPerPixel: 4,
+            hasAlpha: true,
+            isPlanar: false,
+            colorSpaceName: .deviceRGB,
+            bytesPerRow: 0,
+            bitsPerPixel: 0) else {
+            fatalError("could not create bitmap for \(iconName)")
+        }
 
-    if spec.name == "magic_trackpad" {
-        drawMagicTrackpad()
-    } else {
-        let hasBadge = spec.badge != nil
-        let maxSide: CGFloat = hasBadge ? 390 : 440
-        let centerY: CGFloat = hasBadge ? 280 : 256
+        NSGraphicsContext.saveGraphicsState()
+        NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
+        NSGraphicsContext.current?.imageInterpolation = .high
+        NSColor.clear.setFill()
+        NSRect(x: 0, y: 0, width: size, height: size).fill(using: .copy)
 
-        if let image = symbolImage(named: spec.symbol, pointSize: 400, color: blue) {
-            drawCentered(
-                image,
-                in: NSRect(x: 0, y: 0, width: size, height: size),
-                maxSide: maxSide,
-                centerY: centerY)
+        if spec.name == "magic_trackpad" {
+            drawMagicTrackpad(color: variant.color)
         } else {
-            FileHandle.standardError.write(
-                "missing SF Symbol: \(spec.symbol)\n".data(using: .utf8)!)
+            let hasBadge = spec.badge != nil
+            let maxSide: CGFloat = hasBadge ? 390 : 440
+            let centerY: CGFloat = hasBadge ? 280 : 256
+
+            if let image = symbolImage(
+                named: spec.symbol, pointSize: 400, color: variant.color) {
+                drawCentered(
+                    image,
+                    in: NSRect(x: 0, y: 0, width: size, height: size),
+                    maxSide: maxSide,
+                    centerY: centerY)
+            } else {
+                FileHandle.standardError.write(
+                    "missing SF Symbol: \(spec.symbol)\n".data(using: .utf8)!)
+            }
+
+            if let badge = spec.badge {
+                drawBadge(
+                    badge,
+                    at: NSPoint(x: 400, y: 108),
+                    diameter: 140,
+                    color: variant.color)
+            }
         }
 
-        if let badge = spec.badge {
-            drawBadge(badge, at: NSPoint(x: 400, y: 108), diameter: 140)
+        NSGraphicsContext.restoreGraphicsState()
+
+        guard let data = rep.representation(using: .png, properties: [:]) else {
+            fatalError("could not encode \(iconName)")
         }
+        let outputPath = "\(outputDir)/\(iconName).png"
+        try! data.write(to: URL(fileURLWithPath: outputPath))
+        print("wrote \(outputPath)")
     }
-
-    NSGraphicsContext.restoreGraphicsState()
-
-    guard let data = rep.representation(using: .png, properties: [:]) else {
-        fatalError("could not encode \(spec.name)")
-    }
-    let outputPath = "\(outputDir)/\(spec.name).png"
-    try! data.write(to: URL(fileURLWithPath: outputPath))
-    print("wrote \(outputPath)")
 }

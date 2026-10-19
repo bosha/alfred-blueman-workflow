@@ -32,6 +32,20 @@ Regarding MacOS version and devices: This workflow functions perfectly on my Mac
 4. Set up your desired keyboard shortcuts (if any).
 5. Begin using it.
 
+## Development
+
+To copy the runtime script, workflow metadata and icons into the installed Alfred workflow for manual testing:
+
+```shell
+make build-dev
+```
+
+The target finds the installed workflow from Alfred's current preferences by bundle ID. If the workflow is installed elsewhere, override the destination:
+
+```shell
+make build-dev DEV_WORKFLOW="/path/to/user.workflow..."
+```
+
 ## Commands
 
 * **btl**: Displays a list of all paired Bluetooth devices and their connection status. The keyword is configurable in the workflow settings.
@@ -101,11 +115,11 @@ The workflow exposes eight configuration parameters in Alfred (Workflow -> Confi
 
 ## Device icons
 
-Device rows use type-specific icons for keyboards, mice, trackpads, headphones, speakers, phones, tablets, watches, game controllers and computers. AirPods, Magic Mouse/Keyboard/Trackpad, the Logitech MX Master lineup and Keychron devices have dedicated icons.
+Device rows use type-specific icons for keyboards, mice, trackpads, headphones, speakers, phones, tablets, watches, game controllers and computers. AirPods, Magic Mouse/Keyboard/Trackpad, the Logitech MX Master lineup and Keychron devices have dedicated icons. Connected devices use the blue icon; disconnected devices use a muted gray `_off` variant so the connection state is visible at a glance.
 
 Specific-device overrides are data-driven, so adding an icon does not require code changes:
 
-1. Add a 512×512 PNG to `assets/icons/` (transparent background).
+1. Add a 512×512 PNG to `assets/icons/` (transparent background). The base name is used for connected devices; disconnected devices use `<name>_off.png` when it exists, otherwise the base icon.
 2. Add a mapping entry to `assets/icons/map.json`.
 
 Mapping keys are `vendor_id:product_id` in four-digit lowercase hexadecimal, without `0x`. A `vendor_id:*` entry applies to every product from that vendor. Icon names may contain lowercase letters, digits and underscores.
@@ -118,7 +132,9 @@ Mapping keys are `vendor_id:product_id` in four-digit lowercase hexadecimal, wit
 }
 ```
 
-The value is the icon file name without `.png`. The workflow checks the specific product first, then the vendor wildcard. Device IDs are shown in System Information -> Bluetooth. If no mapping matches, the icon is selected from the device type (Classic Class of Device or `system_profiler` minor type), with a device-name fallback.
+The value is the base icon file name without `.png`. The workflow checks the specific product first, then the vendor wildcard. Device IDs are shown in System Information -> Bluetooth. If no mapping matches, the icon is selected from the device type (Classic Class of Device or `system_profiler` minor type), with a device-name fallback.
+
+The bundled generator creates both the blue base icon and the gray `_off` variant for every entry in `specs`. For a manually added icon, include both `<name>.png` and `<name>_off.png` to keep the state distinction.
 
 To regenerate the bundled icons from SF Symbols, run:
 

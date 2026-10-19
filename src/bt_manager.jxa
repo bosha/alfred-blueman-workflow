@@ -498,8 +498,9 @@ const CLASS_OF_DEVICE_MINOR = {
     },
 }
 
-// Output-only device enrichment: adds the type and icon path needed by the
-// list. BtManager deliberately knows nothing about workflow files or icons.
+// Output-only device enrichment: adds the type and state-specific icon path
+// needed by the list. BtManager deliberately knows nothing about workflow
+// files or icons.
 class DeviceEnricher {
     constructor(workflowRoot = null) {
         this.workflowRoot = workflowRoot
@@ -509,7 +510,7 @@ class DeviceEnricher {
     enrich(devices) {
         devices.forEach(device => {
             device.type = this.getDeviceType(device)
-            device.icon = this.getIconPath(device.type)
+            device.icon = this.getIconPath(device.type, device.connected)
         })
         return devices
     }
@@ -588,19 +589,48 @@ class DeviceEnricher {
         return this.iconMap
     }
 
-    getIconPath(type) {
-        let icon = type || DEFAULT_DEVICE_TYPE
-        if (!/^[a-z0-9_]+$/.test(icon)) {
-            icon = DEFAULT_DEVICE_TYPE
+    getIconPath(type, connected = true) {
+        let icon = this.normalizeIconName(type)
+
+        // Disconnected devices use the muted `_off` variant. Custom icons may
+        // only provide the base PNG, so fall back to it when the variant is
+        // absent.
+        if (!connected) {
+            let offIcon = `${icon}_off`
+            if (this.deviceIconExists(offIcon)) {
+                return this.deviceIconPath(offIcon)
+            }
+            log.debug(`device icon variant not found: ${this.deviceIconPath(offIcon)}`)
         }
 
-        if (this.workflowRoot) {
-            let absolute = `${this.workflowRoot}/assets/icons/${icon}.png`
-            if (!$.NSFileManager.defaultManager.fileExistsAtPath(absolute)) {
-                log.error(`device icon not found: ${absolute}`)
-                icon = DEFAULT_DEVICE_TYPE
-            }
+        if (this.deviceIconExists(icon)) {
+            return this.deviceIconPath(icon)
         }
+
+        log.error(`device icon not found: ${this.deviceIconPath(icon)}`)
+        let fallback = connected
+            ? DEFAULT_DEVICE_TYPE
+            : `${DEFAULT_DEVICE_TYPE}_off`
+        if (this.deviceIconExists(fallback)) {
+            return this.deviceIconPath(fallback)
+        }
+        return this.deviceIconPath(DEFAULT_DEVICE_TYPE)
+    }
+
+    normalizeIconName(type) {
+        let icon = type || DEFAULT_DEVICE_TYPE
+        return /^[a-z0-9_]+$/.test(icon) ? icon : DEFAULT_DEVICE_TYPE
+    }
+
+    deviceIconExists(icon) {
+        if (!this.workflowRoot) {
+            return true
+        }
+        let absolute = `${this.workflowRoot}/assets/icons/${icon}.png`
+        return $.NSFileManager.defaultManager.fileExistsAtPath(absolute)
+    }
+
+    deviceIconPath(icon) {
         return `${DEVICE_ICON_DIR}/${icon}.png`
     }
 
