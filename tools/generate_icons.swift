@@ -13,6 +13,8 @@ let blue = NSColor(srgbRed: 0.039, green: 0.518, blue: 1.0, alpha: 1.0)
 // Opaque mid-gray so disconnected icons stay visible on light and dark themes.
 let gray = NSColor(srgbRed: 0.557, green: 0.557, blue: 0.576, alpha: 1.0)
 let white = NSColor.white
+// Destructive action accent (systemRed-ish), used by the unpair icon.
+let red = NSColor(srgbRed: 1.0, green: 0.231, blue: 0.188, alpha: 1.0)
 
 let cwd = FileManager.default.currentDirectoryPath
 let scriptPath = CommandLine.arguments[0].hasPrefix("/")
@@ -31,6 +33,16 @@ struct Spec {
     let name: String
     let symbol: String
     let badge: Badge?
+    // When set, the icon is drawn once in this color (no `_off` variant).
+    // Device icons leave it nil and get the blue/gray variants instead.
+    let color: NSColor?
+
+    init(name: String, symbol: String, badge: Badge?, color: NSColor? = nil) {
+        self.name = name
+        self.symbol = symbol
+        self.badge = badge
+        self.color = color
+    }
 }
 
 let specs: [Spec] = [
@@ -54,6 +66,9 @@ let specs: [Spec] = [
     Spec(name: "airpods_max", symbol: "airpodsmax", badge: nil),
     Spec(name: "mx_master", symbol: "computermouse.fill", badge: nil),
     Spec(name: "keychron", symbol: "keyboard", badge: .letter("K")),
+    // Action icons for the unpair confirmation, drawn once in their own color.
+    Spec(name: "unpair", symbol: "antenna.radiowaves.left.and.right.slash", badge: nil, color: red),
+    Spec(name: "cancel", symbol: "xmark.circle", badge: nil, color: gray),
 ]
 
 struct IconVariant {
@@ -150,7 +165,8 @@ func drawBadge(_ badge: Badge, at center: NSPoint, diameter: CGFloat, color: NSC
 }
 
 for spec in specs {
-    for variant in variants {
+    let specVariants = spec.color.map { [IconVariant(suffix: "", color: $0)] } ?? variants
+    for variant in specVariants {
         let iconName = "\(spec.name)\(variant.suffix)"
 
         guard let rep = NSBitmapImageRep(
