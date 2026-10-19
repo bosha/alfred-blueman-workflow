@@ -256,6 +256,9 @@ const SORTERS = {
     "alphabetical": new AlphabeticalSorter(),
 }
 const DEFAULT_SORT_ORDER = "connected_first"
+// Alfred re-runs the Script Filter while the list is open, so connection
+// states stay current; seconds between refreshes
+const LIST_RERUN_SECONDS = 2
 
 class WorkflowError extends Error {
 	constructor(title, subtitle, ...params) {
@@ -365,10 +368,14 @@ class WorkflowBase {
         this.currentApp.displayNotification(message, options)
     }
 
-	returnResult(data) {
-        return JSON.stringify({
+	returnResult(data, rerun) {
+        let response = {
             "items": data
-        })
+        }
+        if (rerun !== undefined) {
+            response["rerun"] = rerun
+        }
+        return JSON.stringify(response)
 	}
 }
 
@@ -394,7 +401,7 @@ class ListBtDevicesCommand extends WorkflowBase {
                     },
                     "arg": "turn-on",
                 }
-            ])
+            ], LIST_RERUN_SECONDS)
         }
 
         let items = mgr.getPairedDevices()
@@ -456,7 +463,7 @@ class ListBtDevicesCommand extends WorkflowBase {
                 "arg": device.name,
                 })
         })
-        return this.returnResult(results)
+        return this.returnResult(results, LIST_RERUN_SECONDS)
     }
 }
 
