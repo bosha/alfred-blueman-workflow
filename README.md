@@ -51,6 +51,7 @@ make dev-sync DEV_WORKFLOW="/path/to/user.workflow..."
 
 - **btl**: Displays a list of all paired Bluetooth devices and their connection status. The keyword is configurable in the workflow settings.
   - Hold `⌥` (Option) and press `⏎` to star a favorite.
+  - Hold `⌘` (Command) and press `⏎` to ignore or unignore a device.
   - Hold `⌃` (Control) and press `⏎` to unpair a device (**experimental**).
 - **bton**: Turns on Bluetooth on your device.
 - **btoff**: Turns off Bluetooth on your device.
@@ -119,15 +120,24 @@ Hold `⌥` (Option) and press `⏎` on a device in the `btl` list to star or uns
 
 Favorites are stored in the workflow's **Favorites** configuration field (Workflow -> Configure Workflow...), one device name per line. To unstar a device without using the list, delete its line there.
 
+### Ignoring devices
+
+Hold `⌘` (Command) and press `⏎` on a device in the `btl` list to hide it. Ignored devices are filtered out before sorting, so they disappear from `btl` (and from any favorites sorting).
+
+To bring one back, type part of its name in `btl`: ignored devices reappear with a `🚫` next to their name, and `⌘⏎` un-ignores them. Ignored devices are stored in the workflow's **Ignored devices** configuration field (Workflow -> Configure Workflow...), one device name per line — delete a line there to un-ignore without the list.
+
+A device that is both starred and ignored stays hidden (ignoring wins); if you reveal it through a search it shows both the `⭐` and `🚫` markers.
+
 ## Settings
 
-The workflow exposes nine configuration parameters in Alfred (Workflow -> Configure Workflow...):
+The workflow exposes ten configuration parameters in Alfred (Workflow -> Configure Workflow...):
 
 - **List keyword** — keyword used to open the device list (default `btl`).
 - **On keyword** — keyword used to turn Bluetooth on (default `bton`).
 - **Off keyword** — keyword used to turn Bluetooth off (default `btoff`).
 - **Toggle keyword** — keyword used to toggle Bluetooth on or off (default `btt`).
 - **Favorites** — starred devices, one name per line (see above).
+- **Ignored devices** — devices hidden from the `btl` list, one name per line (see above). Type in `btl` to reveal one and un-ignore it.
 - **Sorting** — order of devices in the `btl` list. The order within each group is preserved.
   - `Alfred's order` (default) — no sorting; Alfred orders devices by the ones you use most.
   - `Favorites, then connected` — starred devices first, then connected devices, then the rest.

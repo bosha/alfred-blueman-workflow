@@ -148,6 +148,16 @@
 				<key>vitoclose</key>
 				<false/>
 			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>AD5E9EEA-D2D6-4B54-AE08-B664D282CC32</string>
+				<key>modifiers</key>
+				<integer>1048576</integer>
+				<key>modifiersubtext</key>
+				<string>⌘: Ignore device</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
 		</array>
 		<key>3CC9121C-D758-4CF9-95F1-3B51528B0BC9</key>
 		<array>
@@ -208,6 +218,8 @@
 		<key>ED82FB6E-0C7A-4EA3-94B0-D6758903D9C3</key>
 		<array/>
 		<key>0F92B8F4-7772-4CE1-A455-C3D22B96FABA</key>
+		<array/>
+		<key>AD5E9EEA-D2D6-4B54-AE08-B664D282CC32</key>
 		<array/>
 	</dict>
 	<key>createdby</key>
@@ -784,6 +796,29 @@ echo -n $query
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>/usr/bin/osascript -l JavaScript ./src/bt_manager.jxa ignore "$1"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>AD5E9EEA-D2D6-4B54-AE08-B664D282CC32</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>This workflow enables you to manage your Bluetooth device connections and Bluetooth state directly from Alfred. It offers the following functionalities:
@@ -792,6 +827,7 @@ echo -n $query
 * Connects or disconnects from a paired Bluetooth device.
 * Unpairs a paired device (hold ⌃ and press ⏎ on a device in the list).
 * Stars favorite devices (hold ⌥ and press ⏎) and can sort them first.
+* Hides ignored devices (hold ⌘ and press ⏎ to ignore or unignore; type a name to reveal).
 * Turns Bluetooth on or off for your device, or toggles it with btt.
 * Copies a diagnostics report (btdiag) for issue reports.
 
@@ -1064,6 +1100,27 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<string>textarea</string>
 			<key>variable</key>
 			<string>favorites</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string></string>
+				<key>required</key>
+				<false/>
+				<key>trim</key>
+				<true/>
+				<key>verticalsize</key>
+				<integer>6</integer>
+			</dict>
+			<key>description</key>
+			<string>Devices hidden from the btl list, one per line. Press ⌘⏎ on a device in the list to toggle, or delete a line here to un-ignore it.</string>
+			<key>label</key>
+			<string>Ignored devices</string>
+			<key>type</key>
+			<string>textarea</string>
+			<key>variable</key>
+			<string>ignore</string>
 		</dict>
 		<dict>
 			<key>config</key>

@@ -9,6 +9,7 @@ ObjC.import("CoreBluetooth")
 const ENV_VARS = {
     ALFRED_VERSION: "alfred_version",
     FAVORITES: "favorites",
+    IGNORE: "ignore",
     LIST_KEYWORD: "list_keyword",
     LOG_LEVEL: "log_level",
     NOTIFICATIONS: "notifications",
@@ -29,6 +30,9 @@ const CONFIG_SCHEMA = {
     },
     favorites: {
         env: ENV_VARS.FAVORITES,
+    },
+    ignore: {
+        env: ENV_VARS.IGNORE,
     },
     listKeyword: {
         env: ENV_VARS.LIST_KEYWORD,
@@ -827,11 +831,20 @@ const DEFAULT_SORT_ORDER = ALFRED_SORT_ORDER
 // states stay current; seconds between refreshes
 const LIST_RERUN_SECONDS = 2
 
-// Favorites live in the "favorites" workflow configuration item (a textarea,
-// one device name per line) so users can unstar a device by deleting its line
-// in Alfred's Configure Workflow pane. Names are matched case-insensitively
+// Shared base for the workflow's "one device name per line" configuration
+// lists (favorites and ignored devices). Each lives in a textarea workflow
+// configuration item, so users can drop a name by deleting its line in
+// Alfred's Configure Workflow pane. Names are matched case-insensitively
 // after trimming; the stored value keeps the device's canonical name.
-class Favorites {
+// Subclasses only declare where the list is stored and how it is labelled.
+class NamedList {
+    constructor(value, { envVar, configKey, label }) {
+        this.entries = NamedList.parse(value)
+        this.envVar = envVar
+        this.configKey = configKey
+        this.label = label
+    }
+
     static parse(value) {
         if (value === null || value === undefined) {
             return []
@@ -846,25 +859,56 @@ class Favorites {
         return String(name).trim().toLowerCase()
     }
 
-    static has(favorites, name) {
-        let key = Favorites.normalize(name)
-        return favorites.some(entry => Favorites.normalize(entry) === key)
+    get count() {
+        return this.entries.length
     }
 
-    static add(favorites, name) {
-        if (Favorites.has(favorites, name)) {
-            return favorites
+    has(name) {
+        let key = NamedList.normalize(name)
+        return this.entries.some(entry => NamedList.normalize(entry) === key)
+    }
+
+    add(name) {
+        if (!this.has(name)) {
+            this.entries = this.entries.concat(String(name).trim())
         }
-        return favorites.concat(String(name).trim())
+        return this
     }
 
-    static remove(favorites, name) {
-        let key = Favorites.normalize(name)
-        return favorites.filter(entry => Favorites.normalize(entry) !== key)
+    remove(name) {
+        let key = NamedList.normalize(name)
+        this.entries = this.entries.filter(entry => NamedList.normalize(entry) !== key)
+        return this
     }
 
-    static serialize(favorites) {
-        return favorites.join("\n")
+    toggle(name) {
+        return this.has(name) ? this.remove(name) : this.add(name)
+    }
+
+    serialize() {
+        return this.entries.join("\n")
+    }
+}
+
+// Starred devices (the "favorites" workflow configuration variable)
+class Favorites extends NamedList {
+    constructor(value) {
+        super(value, {
+            envVar: ENV_VARS.FAVORITES,
+            configKey: "favorites",
+            label: "Favorites",
+        })
+    }
+}
+
+// Devices hidden from the list (the "ignore" workflow configuration variable)
+class Ignored extends NamedList {
+    constructor(value) {
+        super(value, {
+            envVar: ENV_VARS.IGNORE,
+            configKey: "ignore",
+            label: "Ignored devices",
+        })
     }
 }
 
@@ -1075,9 +1119,16 @@ class ListBtDevicesCommand extends WorkflowBase {
         // Workflow setting: device addresses in the subtitle (off by default)
         let showAddresses = this.config.showMacAddresses
 
-        let query = this.args.at(1)
+        // Workflow settings: starred and ignored devices, one name per line each
+        let favorites = new Favorites(this.config.favorites)
+        let ignored = new Ignored(this.config.ignore)
 
-        if (query !== null && query !== undefined) {
+        // A non-empty query also reveals ignored devices, so they can be found
+        // and un-ignored; the plain list hides them.
+        let query = this.args.at(1)
+        let hasQuery = query !== null && query !== undefined && String(query).trim() !== ""
+
+        if (hasQuery) {
             log.debug(`filtering devices by query '${query}'`)
             let normalizedQuery = query.toLowerCase()
             items = items.filter(device => {
@@ -1095,12 +1146,21 @@ class ListBtDevicesCommand extends WorkflowBase {
                     `No devices matching query "${query}`
                 )
             }
+        } else {
+            items = items.filter(device => !ignored.has(device.name))
+            if (items.length === 0) {
+                log.debug("all paired devices are ignored")
+                return this.returnResult([{
+                    "title": "All devices are ignored",
+                    "subtitle": "Type a device name to find and unignore it, or edit the Ignored devices setting",
+                    "valid": false,
+                }], LIST_RERUN_SECONDS)
+            }
         }
-        
-        // Workflow setting: starred devices, one device name per line
-        let favorites = Favorites.parse(this.config.favorites)
+
         items.forEach(device => {
-            device.favorite = Favorites.has(favorites, device.name)
+            device.favorite = favorites.has(device.name)
+            device.ignored = ignored.has(device.name)
         })
 
         // Workflow setting; unset or unknown falls back to the default order.
@@ -1142,9 +1202,18 @@ class ListBtDevicesCommand extends WorkflowBase {
                 "arg": device.name,
                 "subtitle": device.favorite ? "Remove from favorites" : "Add to favorites"
             }
+            // The ⌘ modifier toggles the ignore state for this device
+            mods.cmd = {
+                "arg": device.name,
+                "subtitle": device.ignored ? "Unignore device" : "Ignore device"
+            }
+
+            // A ⭐ marks a favorite, a 🚫 marks an ignored device; both can show
+            // when an ignored device is revealed through a search query.
+            let prefix = `${device.favorite ? "⭐ " : ""}${device.ignored ? "🚫 " : ""}`
 
             let item = {
-                "title": device.favorite ? `⭐ ${device.name}` : device.name,
+                "title": `${prefix}${device.name}`,
                 "subtitle": subtitleParts.join(" · "),
                 "icon": {
                     "path": device.icon
@@ -1380,19 +1449,24 @@ class UnpairDeviceCommand extends WorkflowBase {
     }
 }
 
-// Toggles the selected device in the "favorites" workflow configuration
-// variable (one device name per line). No Bluetooth permission gate: favorites
-// are pure configuration, and a name that no longer resolves is still toggled
-// as given.
-class ToggleFavoriteCommand extends WorkflowBase {
+// Toggles the selected device in a "one device name per line" workflow
+// configuration variable (favorites or ignored devices). No Bluetooth
+// permission gate: these lists are pure configuration, and a name that no
+// longer resolves is still toggled as given. Subclasses build the list.
+class ToggleNamedListCommand extends WorkflowBase {
+    list() {
+        throw new Error("ToggleNamedListCommand subclasses must implement list()")
+    }
+
     run() {
-        log.debug("running toggle favorite command")
+        let list = this.list()
+        log.debug(`running toggle ${list.configKey} command`)
 
         let deviceName = this.args.at(1)
         if (deviceName === undefined) {
             log.error("missing required parameter \"deviceName\"")
             this.notify(
-                "Could not update favorites: no device name was provided",
+                `Could not update ${list.label}: no device name was provided`,
                 {withTitle: "Blueman", subtitle: "Invalid arguments"},
                 true
             )
@@ -1403,20 +1477,25 @@ class ToggleFavoriteCommand extends WorkflowBase {
         let device = mgr.getDeviceByName(deviceName)
         let name = device === null ? deviceName : device.name
 
-        let favorites = Favorites.parse(this.config.favorites)
-        let isFavorite = Favorites.has(favorites, name)
-        favorites = isFavorite
-            ? Favorites.remove(favorites, name)
-            : Favorites.add(favorites, name)
+        let had = list.has(name)
+        list.toggle(name)
 
-        this.setEnvVar(ENV_VARS.FAVORITES, Favorites.serialize(favorites))
+        this.setEnvVar(list.envVar, list.serialize())
 
-        log.debug(`${isFavorite ? "removed" : "added"} "${name}" ${isFavorite ? "from" : "to"} favorites`)
+        log.debug(`${had ? "removed" : "added"} "${name}" ${had ? "from" : "to"} ${list.configKey}`)
         this.notify(
-            `${isFavorite ? "Removed" : "Added"} ${name} ${isFavorite ? "from" : "to"} favorites`,
-            {withTitle: "Blueman", subtitle: "Favorites"}
+            `${had ? "Removed" : "Added"} ${name} ${had ? "from" : "to"} ${list.label}`,
+            {withTitle: "Blueman", subtitle: list.label}
         )
     }
+}
+
+class ToggleFavoriteCommand extends ToggleNamedListCommand {
+    list() { return new Favorites(this.config.favorites) }
+}
+
+class ToggleIgnoreCommand extends ToggleNamedListCommand {
+    list() { return new Ignored(this.config.ignore) }
 }
 
 class TurnBtOffCommand extends WorkflowBase {
@@ -1622,7 +1701,8 @@ class DiagnosticsCommand extends WorkflowBase {
                 + `off=${this.config.offKeyword}, toggle=${this.config.toggleKeyword}`,
             `Settings: sort_order=${this.config.sortOrder || DEFAULT_SORT_ORDER}, `
                 + `show_mac_addresses=${this.config.showMacAddresses ? "on" : "off"}, `
-                + `notifications=${this.config.notifications}`,
+                + `notifications=${this.config.notifications}, `
+                + `ignored=${new Ignored(this.config.ignore).count}`,
         ]
 
         if (info.devices.length > 0) {
@@ -1653,6 +1733,7 @@ const possibleCommands = {
     "list": ListBtDevicesCommand,
     "diagnostics": DiagnosticsCommand,
     "favorite": ToggleFavoriteCommand,
+    "ignore": ToggleIgnoreCommand,
     "toggle": ToggleConnectionCommand,
     "toggle-power": TogglePowerCommand,
     "turn-on": TurnBtOnCommand,
