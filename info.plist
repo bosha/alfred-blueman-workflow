@@ -358,7 +358,7 @@ echo -n $query
 				<key>argumenttype</key>
 				<integer>2</integer>
 				<key>keyword</key>
-				<string>bton</string>
+				<string>{var:on_keyword}</string>
 				<key>subtext</key>
 				<string>Turn on host bluetooth adapter</string>
 				<key>text</key>
@@ -433,7 +433,7 @@ echo -n $query
 				<key>argumenttype</key>
 				<integer>2</integer>
 				<key>keyword</key>
-				<string>btoff</string>
+				<string>{var:off_keyword}</string>
 				<key>subtext</key>
 				<string></string>
 				<key>text</key>
@@ -599,7 +599,7 @@ echo -n $query
 				<key>argumenttype</key>
 				<integer>2</integer>
 				<key>keyword</key>
-				<string>btt</string>
+				<string>{var:toggle_keyword}</string>
 				<key>subtext</key>
 				<string>Toggle Bluetooth on or off</string>
 				<key>text</key>
@@ -819,6 +819,69 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<string>textfield</string>
 			<key>variable</key>
 			<string>list_keyword</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>bton</string>
+				<key>placeholder</key>
+				<string></string>
+				<key>required</key>
+				<true/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Keyword used to turn Bluetooth on</string>
+			<key>label</key>
+			<string>On keyword</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>on_keyword</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>btoff</string>
+				<key>placeholder</key>
+				<string></string>
+				<key>required</key>
+				<true/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Keyword used to turn Bluetooth off</string>
+			<key>label</key>
+			<string>Off keyword</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>off_keyword</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>btt</string>
+				<key>placeholder</key>
+				<string></string>
+				<key>required</key>
+				<true/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Keyword used to toggle Bluetooth on or off</string>
+			<key>label</key>
+			<string>Toggle keyword</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>toggle_keyword</string>
 		</dict>
 		<dict>
 			<key>config</key>

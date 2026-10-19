@@ -88,9 +88,12 @@ The workflow detects LE devices and reports that disconnecting them is not suppo
 
 ## Settings
 
-The workflow exposes five configuration parameters in Alfred (Workflow -> Configure Workflow...):
+The workflow exposes eight configuration parameters in Alfred (Workflow -> Configure Workflow...):
 
 * **List keyword** — keyword used to open the device list (default `btl`).
+* **On keyword** — keyword used to turn Bluetooth on (default `bton`).
+* **Off keyword** — keyword used to turn Bluetooth off (default `btoff`).
+* **Toggle keyword** — keyword used to toggle Bluetooth on or off (default `btt`).
 * **Sorting** — `Connected first` (default) shows connected devices at the top of the `btl` list, `Alphabetical` sorts devices by name, `Default` keeps the macOS order. The order within each group is preserved.
 * **MAC addresses** — show device addresses in the `btl` list (off by default). When enabled, the list can also be filtered by address; when disabled, only device names are matched.
 * **Notifications** — `On` (default), `Only errors`, or `Off`.

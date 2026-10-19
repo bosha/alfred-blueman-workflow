@@ -11,8 +11,11 @@ const ENV_VARS = {
     LIST_KEYWORD: "list_keyword",
     LOG_LEVEL: "log_level",
     NOTIFICATIONS: "notifications",
+    OFF_KEYWORD: "off_keyword",
+    ON_KEYWORD: "on_keyword",
     SORT_ORDER: "sort_order",
     SHOW_MAC_ADDRESSES: "show_mac_addresses",
+    TOGGLE_KEYWORD: "toggle_keyword",
     WORKFLOW_BUNDLE_ID: "alfred_workflow_bundleid",
     WORKFLOW_VERSION: "alfred_workflow_version",
 }
@@ -26,6 +29,18 @@ const CONFIG_SCHEMA = {
     listKeyword: {
         env: ENV_VARS.LIST_KEYWORD,
         default: "btl",
+    },
+    offKeyword: {
+        env: ENV_VARS.OFF_KEYWORD,
+        default: "btoff",
+    },
+    onKeyword: {
+        env: ENV_VARS.ON_KEYWORD,
+        default: "bton",
+    },
+    toggleKeyword: {
+        env: ENV_VARS.TOGGLE_KEYWORD,
+        default: "btt",
     },
     logLevel: {
         env: ENV_VARS.LOG_LEVEL,
@@ -833,8 +848,9 @@ class DiagnosticsCommand extends WorkflowBase {
             `Bluetooth permission: ${this.permissionLabel(info)}`,
             `Bluetooth power: ${this.powerLabel(info)}`,
             `Paired devices: ${this.deviceCountLabel(info)}`,
-            `Settings: list_keyword=${this.config.listKeyword}, `
-                + `sort_order=${this.config.sortOrder || DEFAULT_SORT_ORDER}, `
+            `Keywords: list=${this.config.listKeyword}, on=${this.config.onKeyword}, `
+                + `off=${this.config.offKeyword}, toggle=${this.config.toggleKeyword}`,
+            `Settings: sort_order=${this.config.sortOrder || DEFAULT_SORT_ORDER}, `
                 + `show_mac_addresses=${this.config.showMacAddresses ? "on" : "off"}, `
                 + `notifications=${this.config.notifications}`,
         ]
