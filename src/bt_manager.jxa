@@ -772,7 +772,10 @@ class DeviceEnricher {
 // Device list ordering. Sorters are stateless: sort() must not mutate the
 // input and must preserve the original order within groups, so switching
 // modes never reshuffles devices inside a group
-class DefaultSorter {
+// No-op sorter: returns the devices in their natural (macOS) order. Shared by
+// the "Default" and "Alfred's order" modes; they differ only in whether the
+// list keeps the item uid, which decides if Alfred may reorder by knowledge.
+class UnsortedSorter {
     sort(devices) {
         return devices
     }
@@ -808,13 +811,18 @@ class FavoritesThenConnectedSorter {
 }
 
 const SORTERS = {
-    "default": new DefaultSorter(),
+    "default": new UnsortedSorter(),
     "connected_first": new ConnectedFirstSorter(),
     "alphabetical": new AlphabeticalSorter(),
     "favorites_first": new FavoritesFirstSorter(),
     "favorites_then_connected": new FavoritesThenConnectedSorter(),
+    // Applies no sorting: the list keeps the item uid so Alfred orders the
+    // results by its learned knowledge (most-used first)
+    "alfred": new UnsortedSorter(),
 }
-const DEFAULT_SORT_ORDER = "favorites_then_connected"
+// "Alfred's order" delegates ordering to Alfred; every other mode sorts here
+const ALFRED_SORT_ORDER = "alfred"
+const DEFAULT_SORT_ORDER = ALFRED_SORT_ORDER
 // Alfred re-runs the Script Filter while the list is open, so connection
 // states stay current; seconds between refreshes
 const LIST_RERUN_SECONDS = 2
@@ -1013,12 +1021,15 @@ class WorkflowBase {
         this.currentApp.displayNotification(message, options)
     }
 
-	returnResult(data, rerun) {
+	returnResult(data, rerun, skipKnowledge = true) {
         let response = {
-            "items": data,
-            // Without this, Alfred re-orders results by its learned knowledge
-            // (the item `uid`s), overriding the sort the workflow computed.
-            "skipknowledge": true
+            "items": data
+        }
+        // When true, Alfred presents the items in the returned order instead of
+        // re-ordering them by its learned knowledge. The list turns this off
+        // for "Alfred's order" mode so Alfred can apply its knowledge there.
+        if (skipKnowledge) {
+            response["skipknowledge"] = true
         }
         if (rerun !== undefined) {
             response["rerun"] = rerun
@@ -1092,11 +1103,15 @@ class ListBtDevicesCommand extends WorkflowBase {
             device.favorite = Favorites.has(favorites, device.name)
         })
 
-        // Workflow setting; unset or unknown falls back to the default order
-        let sortOrder = this.config.sortOrder
-        let sorter = SORTERS[sortOrder] || SORTERS[DEFAULT_SORT_ORDER]
+        // Workflow setting; unset or unknown falls back to the default order.
+        // "Alfred's order" applies no sorting and keeps the item uid so Alfred
+        // can order by its learned knowledge; every other mode strips the uid
+        // (below) so the order computed here is shown exactly.
+        let requestedOrder = this.config.sortOrder
+        let sortOrder = SORTERS[requestedOrder] ? requestedOrder : DEFAULT_SORT_ORDER
+        let useAlfredOrder = sortOrder === ALFRED_SORT_ORDER
         log.debug(`sorting devices with order '${sortOrder}'`)
-        items = sorter.sort(items)
+        items = SORTERS[sortOrder].sort(items)
 
         // Enrich only the devices that will actually be displayed.
         items = new DeviceEnricher(this.getWorkflowRoot()).enrich(items)
@@ -1128,10 +1143,7 @@ class ListBtDevicesCommand extends WorkflowBase {
                 "subtitle": device.favorite ? "Remove from favorites" : "Add to favorites"
             }
 
-            results.push({
-                // No uid on purpose: Alfred would otherwise re-order the list
-                // by its learned knowledge, ignoring the sort computed above.
-                // (skipknowledge alone cannot undo knowledge already learned.)
+            let item = {
                 "title": device.favorite ? `⭐ ${device.name}` : device.name,
                 "subtitle": subtitleParts.join(" · "),
                 "icon": {
@@ -1139,9 +1151,16 @@ class ListBtDevicesCommand extends WorkflowBase {
                 },
                 "arg": device.name,
                 "mods": mods,
-                })
+            }
+            // "Alfred's order" keeps the uid so Alfred can apply its knowledge;
+            // every other mode omits it so Alfred shows the computed order
+            // instead of re-sorting by what it already learned.
+            if (useAlfredOrder) {
+                item["uid"] = device.name
+            }
+            results.push(item)
         })
-        return this.returnResult(results, LIST_RERUN_SECONDS)
+        return this.returnResult(results, LIST_RERUN_SECONDS, !useAlfredOrder)
     }
 }
 

@@ -115,7 +115,7 @@ This is a destructive, best-effort operation:
 
 ### Favorites
 
-Hold `⌥` (Option) and press `⏎` on a device in the `btl` list to star or unstar it. Starred devices show a `⭐` next to their name and are sorted to the top by default.
+Hold `⌥` (Option) and press `⏎` on a device in the `btl` list to star or unstar it. Starred devices show a `⭐` next to their name; pick a favorites sorting option (see Settings) to bring them to the top.
 
 Favorites are stored in the workflow's **Favorites** configuration field (Workflow -> Configure Workflow...), one device name per line. To unstar a device without using the list, delete its line there.
 
@@ -129,7 +129,8 @@ The workflow exposes nine configuration parameters in Alfred (Workflow -> Config
 - **Toggle keyword** — keyword used to toggle Bluetooth on or off (default `btt`).
 - **Favorites** — starred devices, one name per line (see above).
 - **Sorting** — order of devices in the `btl` list. The order within each group is preserved.
-  - `Favorites, then connected` (default) — starred devices first, then connected devices, then the rest.
+  - `Alfred's order` (default) — no sorting; Alfred orders devices by the ones you use most.
+  - `Favorites, then connected` — starred devices first, then connected devices, then the rest.
   - `Favorites first` — starred devices at the top.
   - `Connected first` — connected devices at the top.
   - `Alphabetical` — sorted by device name.
