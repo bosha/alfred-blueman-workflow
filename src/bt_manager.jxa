@@ -382,6 +382,21 @@ class ListBtDevicesCommand extends WorkflowBase {
 
         let mgr = new BtManager()
 
+        if (!mgr.isBluetoothOn()) {
+            log.debug("bluetooth is off, offering to turn it on")
+            return this.returnResult([
+                {
+                    "uid": "bt-power-off",
+                    "title": "Bluetooth is off",
+                    "subtitle": "Press Enter to turn Bluetooth on",
+                    "icon": {
+                        "path": "./assets/off.png"
+                    },
+                    "arg": "turn-on",
+                }
+            ])
+        }
+
         let items = mgr.getPairedDevices()
         log.debug(`got '${items.length}' paired bluetooth devices`)
         if (items.length === 0) {
@@ -425,6 +440,10 @@ class ListBtDevicesCommand extends WorkflowBase {
                 subtitle = subtitle === ""
                     ? device.address
                     : `${subtitle} (${device.address})`
+            }
+
+            if (subtitle === "") {
+                subtitle = device.connected ? "Connected" : "Disconnected"
             }
 
             results.push({
