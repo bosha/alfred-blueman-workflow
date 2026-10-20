@@ -855,8 +855,17 @@ class NamedList {
             .filter(line => line !== "")
     }
 
+    // Device names come from IOBluetooth in composed (NFC) form, while text
+    // pasted into the configuration textareas is often decomposed (NFD, e.g.
+    // Cyrillic "й" as "и" + combining breve) and may contain non-breaking or
+    // other Unicode spaces. Normalize both sides so visually identical names
+    // still match.
     static normalize(name) {
-        return String(name).trim().toLowerCase()
+        return String(name)
+            .normalize("NFC")
+            .replace(/\s+/g, " ")
+            .trim()
+            .toLowerCase()
     }
 
     get count() {
