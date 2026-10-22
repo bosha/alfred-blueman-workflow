@@ -47,6 +47,8 @@ The target finds the installed workflow from Alfred's current preferences by bun
 make dev-sync DEV_WORKFLOW="/path/to/user.workflow..."
 ```
 
+To build a distributable bundle and cut a release (`make package` / `make release`), see [RELEASING.md](RELEASING.md).
+
 ## Commands
 
 - **btl**: Displays a list of all paired Bluetooth devices and their connection status. The keyword is configurable in the workflow settings.
@@ -130,7 +132,7 @@ A device that is both starred and ignored stays hidden (ignoring wins); if you r
 
 ## Settings
 
-The workflow exposes ten configuration parameters in Alfred (Workflow -> Configure Workflow...):
+The workflow exposes eleven configuration parameters in Alfred (Workflow -> Configure Workflow...):
 
 - **List keyword** — keyword used to open the device list (default `btl`).
 - **On keyword** — keyword used to turn Bluetooth on (default `bton`).
@@ -146,8 +148,13 @@ The workflow exposes ten configuration parameters in Alfred (Workflow -> Configu
   - `Alphabetical` — sorted by device name.
   - `Default` — keeps the macOS order.
 - **MAC addresses** — show device addresses in the `btl` list (off by default). When enabled, the list can also be filtered by address; when disabled, only device names are matched.
+- **Battery icons** — `Auto` (default), `SF Symbols`, or `Emoji`. AirPods left/right/case levels and other battery readings use SF Symbols glyphs when available; `Auto` uses them only when Apple's SF Pro font is installed, otherwise it falls back to emoji.
 - **Notifications** — `On` (default), `Only errors`, or `Off`.
 - **Logging Level** — defaults to `Info`. Useful only for development purposes.
+
+### Battery icons
+
+Battery levels are shown either with emoji or with [SF Symbols](https://developer.apple.com/sf-symbols/) glyphs. The glyphs live in Apple's **SF Pro** font, which is not installed by default: install it from [developer.apple.com/fonts](https://developer.apple.com/fonts/) and the **Battery icons** setting set to `Auto` starts using the SF Symbols variants for AirPods left/right/case and for level-based battery readings. Without the font the workflow falls back to emoji; set the setting to `Emoji` to force the fallback or `SF Symbols` to force the glyphs.
 
 ## Device icons
 

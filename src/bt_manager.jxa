@@ -3,11 +3,13 @@ ObjC.import("AppKit")
 ObjC.import("stdlib")
 ObjC.import("IOBluetooth")
 ObjC.import("CoreBluetooth")
+ObjC.import("CoreText")
 
 // Environment variables set by Alfred (workflow settings plus Alfred's own
 // variables). Keep the names here instead of inlining them at call sites.
 const ENV_VARS = {
     ALFRED_VERSION: "alfred_version",
+    BATTERY_ICONS: "battery_icons",
     FAVORITES: "favorites",
     IGNORE: "ignore",
     LIST_KEYWORD: "list_keyword",
@@ -27,6 +29,10 @@ const ENV_VARS = {
 const CONFIG_SCHEMA = {
     alfredVersion: {
         env: ENV_VARS.ALFRED_VERSION,
+    },
+    batteryIcons: {
+        env: ENV_VARS.BATTERY_ICONS,
+        default: "auto",
     },
     favorites: {
         env: ENV_VARS.FAVORITES,
@@ -71,6 +77,94 @@ const CONFIG_SCHEMA = {
     workflowVersion: {
         env: ENV_VARS.WORKFLOW_VERSION,
     },
+}
+
+// SF Symbols glyphs (private-use-area codepoints) used for battery levels.
+// They only render when Apple's SF Pro font is installed; on stock macOS the
+// codepoints resolve to the `LastResort` placeholder font and show as tofu,
+// so the workflow falls back to emoji. See the "Battery icons" setting.
+const SF_SYMBOLS = {
+    airpodsLeft: "\u{100C8E}",
+    airpodsRight: "\u{100C8D}",
+    airpodsCase: "\u{100E6C}",
+}
+
+// Map a battery percentage to the matching SF Symbols battery glyph. The
+// buckets mirror zeitlings' "Bluetooth Device Battery" workflow.
+function sfBatteryGlyph(level) {
+    if (level >= 90) { return "\u{1006E8}" }
+    if (level >= 60) { return "\u{100EB8}" }
+    if (level >= 35) { return "\u{100EB6}" }
+    if (level >= 10) { return "\u{1006E9}" }
+    return "\u{1006EA}"
+}
+
+let sfSymbolsAvailableCache = null
+
+// Whether the installed fonts can render the SF Symbols glyphs above.
+// Resolving a glyph from the system font yields the `LastResort` placeholder
+// when no font covers the private-use range (stock macOS); any other font
+// means SF Pro (or an equivalent) is installed.
+function sfSymbolsAvailable() {
+    if (sfSymbolsAvailableCache !== null) {
+        return sfSymbolsAvailableCache
+    }
+
+    sfSymbolsAvailableCache = false
+    try {
+        let base = $.CTFontCreateUIFontForLanguage($.kCTFontUIFontSystem, 12, $())
+        let probe = $(SF_SYMBOLS.airpodsLeft)
+        let font = $.CTFontCreateForString(
+            base, probe, $.CFRangeMake(0, probe.length))
+        let name = $.CFStringGetCStringPtr(
+            $.CTFontCopyPostScriptName(font), $.kCFStringEncodingUTF8)
+        if (name !== null) {
+            sfSymbolsAvailableCache = name !== "LastResort"
+        } else {
+            // Fall back to comparing against the LastResort placeholder font
+            // when the PostScript name cannot be read as a C string.
+            let lastResort = $.CTFontCreateWithName($("LastResort"), 12, $())
+            sfSymbolsAvailableCache = !$.CFEqual(font, lastResort)
+        }
+    } catch (e) {
+        log && log.debug(`could not probe for SF Symbols support: ${e}`)
+    }
+    return sfSymbolsAvailableCache
+}
+
+// Render raw battery levels (as returned by BtManager) into the subtitle
+// fragment. `mode` is the "Battery icons" setting: "sf" forces the SF Symbols
+// glyphs, "emoji" forces emoji and anything else uses the glyphs only when the
+// SF Pro font is available. Returns null when the device reports no levels.
+function formatBatteryLabel(battery, mode) {
+    if (!battery) {
+        return null
+    }
+
+    let sf = mode === "sf" || (mode !== "emoji" && sfSymbolsAvailable())
+    if (battery.left > 0 || battery.right > 0) {
+        let parts = []
+        if (battery.left > 0) {
+            parts.push(sf ? `${SF_SYMBOLS.airpodsLeft} ${battery.left}%` : `🎧 L ${battery.left}%`)
+        }
+        if (battery.right > 0) {
+            parts.push(sf ? `${SF_SYMBOLS.airpodsRight} ${battery.right}%` : `🎧 R ${battery.right}%`)
+        }
+        if (battery.case > 0) {
+            parts.push(sf ? `${SF_SYMBOLS.airpodsCase} ${battery.case}%` : `🔋 ${battery.case}%`)
+        }
+        return parts.join("  ")
+    }
+
+    if (battery.single > 0) {
+        return sf ? `${sfBatteryGlyph(battery.single)} ${battery.single}%` : `🔋 ${battery.single}%`
+    }
+
+    if (battery.combined > 0) {
+        return sf ? `${sfBatteryGlyph(battery.combined)} ${battery.combined}%` : `🔋 ${battery.combined}%`
+    }
+
+    return null
 }
 
 class Config {
@@ -227,7 +321,7 @@ class BtManager {
                 "connected": connected,
                 "address": address,
                 "addressKey": this._normalizeAddress(address),
-                "battery": this.getBatteryLabel(device),
+                "battery": this.getBatteryLevels(device),
                 "isBle": isBle,
                 "minorType": null,
                 "vendorID": this._normalizeHex4(ObjC.unwrap(device.vendorID)),
@@ -398,38 +492,19 @@ class BtManager {
     // Last-known battery levels from the IOBluetooth device object; 0 means
     // the device does not report that value. BLE devices currently report
     // nothing at all (all getters are 0)
-    getBatteryLabel(device) {
+    getBatteryLevels(device) {
         try {
-            let left = device.batteryPercentLeft
-            let right = device.batteryPercentRight
-            let caseLevel = device.batteryPercentCase
-            if (left > 0 || right > 0) {
-                let parts = []
-                if (left > 0) {
-                    parts.push(`🎧 L ${left}%`)
-                }
-                if (right > 0) {
-                    parts.push(`🎧 R ${right}%`)
-                }
-                if (caseLevel > 0) {
-                    parts.push(`🔋 ${caseLevel}%`)
-                }
-                return parts.join("  ")
-            }
-
-            let single = device.batteryPercentSingle
-            if (single > 0) {
-                return `🔋 ${single}%`
-            }
-
-            let combined = device.batteryPercentCombined
-            if (combined > 0) {
-                return `🔋 ${combined}%`
+            return {
+                left: device.batteryPercentLeft,
+                right: device.batteryPercentRight,
+                case: device.batteryPercentCase,
+                single: device.batteryPercentSingle,
+                combined: device.batteryPercentCombined,
             }
         } catch (e) {
             log.debug(`could not read battery level: ${e}`)
+            return null
         }
-        return null
     }
 
     disconnectDevice(device) {
@@ -1190,8 +1265,9 @@ class ListBtDevicesCommand extends WorkflowBase {
             // Type icons replace the old on/off icons, so the connection state
             // is always part of the subtitle, followed by battery/address.
             let subtitleParts = [device.connected ? "Connected" : "Disconnected"]
-            if (device.battery) {
-                subtitleParts.push(device.battery)
+            let battery = formatBatteryLabel(device.battery, this.config.batteryIcons)
+            if (battery) {
+                subtitleParts.push(battery)
             }
             if (showAddresses) {
                 subtitleParts.push(device.address)
@@ -1710,6 +1786,7 @@ class DiagnosticsCommand extends WorkflowBase {
                 + `off=${this.config.offKeyword}, toggle=${this.config.toggleKeyword}`,
             `Settings: sort_order=${this.config.sortOrder || DEFAULT_SORT_ORDER}, `
                 + `show_mac_addresses=${this.config.showMacAddresses ? "on" : "off"}, `
+                + `battery_icons=${this.config.batteryIcons || "auto"}, `
                 + `notifications=${this.config.notifications}, `
                 + `ignored=${new Ignored(this.config.ignore).count}`,
         ]
@@ -1724,7 +1801,7 @@ class DiagnosticsCommand extends WorkflowBase {
                 lines.push(
                     `- ${name} | ${device.isBle ? "LE" : "Classic"} | `
                     + `${device.connected ? "connected" : "disconnected"} | `
-                    + `battery: ${device.battery || "n/a"}${address}`)
+                    + `battery: ${formatBatteryLabel(device.battery, this.config.batteryIcons) || "n/a"}${address}`)
             })
         }
 

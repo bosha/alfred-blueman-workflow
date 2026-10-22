@@ -258,7 +258,7 @@
 				<key>runningsubtext</key>
 				<string></string>
 				<key>script</key>
-				<string>/usr/bin/osascript -l JavaScript ./bt_manager.jxa turn-on</string>
+				<string>/usr/bin/osascript -l JavaScript ./src/bt_manager.jxa turn-on</string>
 				<key>scriptargtype</key>
 				<integer>1</integer>
 				<key>scriptfile</key>
@@ -1212,6 +1212,36 @@ For details see workflow github page - https://github.com/bosha/alfred-blueman-w
 			<string>checkbox</string>
 			<key>variable</key>
 			<string>show_mac_addresses</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>auto</string>
+				<key>pairs</key>
+				<array>
+					<array>
+						<string>Auto</string>
+						<string>auto</string>
+					</array>
+					<array>
+						<string>SF Symbols</string>
+						<string>sf</string>
+					</array>
+					<array>
+						<string>Emoji</string>
+						<string>emoji</string>
+					</array>
+				</array>
+			</dict>
+			<key>description</key>
+			<string>Use Apple's SF Symbols for battery levels. Auto uses them when the SF Pro font is installed.</string>
+			<key>label</key>
+			<string>Battery icons</string>
+			<key>type</key>
+			<string>popupbutton</string>
+			<key>variable</key>
+			<string>battery_icons</string>
 		</dict>
 		<dict>
 			<key>config</key>
