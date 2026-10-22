@@ -1,3 +1,4 @@
 .alfredversionchecked
 prefs.plist
 dist/
+.DS_Store
