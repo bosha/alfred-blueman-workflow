@@ -21,6 +21,34 @@
 				<false/>
 			</dict>
 		</array>
+		<key>0F92B8F4-7772-4CE1-A455-C3D22B96FABA</key>
+		<array/>
+		<key>244F6CD2-31AD-4119-9D95-6458CE2664BE</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>D14BC437-BCD4-4BB6-BAA9-114CA20A1C79</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>3CC9121C-D758-4CF9-95F1-3B51528B0BC9</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>78526B29-80D7-4FC7-8AA8-3BE2C44B2D39</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
 		<key>3FF8E7D0-F1C5-4F5E-8851-C9742A4582B9</key>
 		<array/>
 		<key>44941A6C-C078-4653-AD1F-E3D703E3EEE9</key>
@@ -52,6 +80,19 @@
 			<dict>
 				<key>destinationuid</key>
 				<string>62780805-57C1-4A16-A1F9-9C24EB09D74C</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>4842229E-0BF7-462A-B9DB-0D1DBC16323B</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>ED82FB6E-0C7A-4EA3-94B0-D6758903D9C3</string>
 				<key>modifiers</key>
 				<integer>0</integer>
 				<key>modifiersubtext</key>
@@ -114,7 +155,28 @@
 				<false/>
 			</dict>
 		</array>
+		<key>78526B29-80D7-4FC7-8AA8-3BE2C44B2D39</key>
+		<array/>
+		<key>A84091A1-BDBF-472D-80C4-5AD2C2F3BF60</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>D14BC437-BCD4-4BB6-BAA9-114CA20A1C79</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>AD5E9EEA-D2D6-4B54-AE08-B664D282CC32</key>
+		<array/>
 		<key>C90C27BF-2899-45D7-8C55-D4DF84ECA712</key>
+		<array/>
+		<key>D14BC437-BCD4-4BB6-BAA9-114CA20A1C79</key>
+		<array/>
+		<key>ED82FB6E-0C7A-4EA3-94B0-D6758903D9C3</key>
 		<array/>
 		<key>F49AD98A-0D8A-4574-8A8D-A21AA143461F</key>
 		<array>
@@ -159,68 +221,6 @@
 				<false/>
 			</dict>
 		</array>
-		<key>3CC9121C-D758-4CF9-95F1-3B51528B0BC9</key>
-		<array>
-			<dict>
-				<key>destinationuid</key>
-				<string>78526B29-80D7-4FC7-8AA8-3BE2C44B2D39</string>
-				<key>modifiers</key>
-				<integer>0</integer>
-				<key>modifiersubtext</key>
-				<string></string>
-				<key>vitoclose</key>
-				<false/>
-			</dict>
-		</array>
-		<key>78526B29-80D7-4FC7-8AA8-3BE2C44B2D39</key>
-		<array/>
-		<key>A84091A1-BDBF-472D-80C4-5AD2C2F3BF60</key>
-		<array>
-			<dict>
-				<key>destinationuid</key>
-				<string>D14BC437-BCD4-4BB6-BAA9-114CA20A1C79</string>
-				<key>modifiers</key>
-				<integer>0</integer>
-				<key>modifiersubtext</key>
-				<string></string>
-				<key>vitoclose</key>
-				<false/>
-			</dict>
-		</array>
-		<key>244F6CD2-31AD-4119-9D95-6458CE2664BE</key>
-		<array>
-			<dict>
-				<key>destinationuid</key>
-				<string>D14BC437-BCD4-4BB6-BAA9-114CA20A1C79</string>
-				<key>modifiers</key>
-				<integer>0</integer>
-				<key>modifiersubtext</key>
-				<string></string>
-				<key>vitoclose</key>
-				<false/>
-			</dict>
-		</array>
-		<key>D14BC437-BCD4-4BB6-BAA9-114CA20A1C79</key>
-		<array/>
-		<key>4842229E-0BF7-462A-B9DB-0D1DBC16323B</key>
-		<array>
-			<dict>
-				<key>destinationuid</key>
-				<string>ED82FB6E-0C7A-4EA3-94B0-D6758903D9C3</string>
-				<key>modifiers</key>
-				<integer>0</integer>
-				<key>modifiersubtext</key>
-				<string></string>
-				<key>vitoclose</key>
-				<false/>
-			</dict>
-		</array>
-		<key>ED82FB6E-0C7A-4EA3-94B0-D6758903D9C3</key>
-		<array/>
-		<key>0F92B8F4-7772-4CE1-A455-C3D22B96FABA</key>
-		<array/>
-		<key>AD5E9EEA-D2D6-4B54-AE08-B664D282CC32</key>
-		<array/>
 	</dict>
 	<key>createdby</key>
 	<string>Bosha</string>
@@ -850,6 +850,33 @@ For details see the workflow GitHub page - https://github.com/bosha/alfred-bluem
 			<key>ypos</key>
 			<real>15</real>
 		</dict>
+		<key>0F92B8F4-7772-4CE1-A455-C3D22B96FABA</key>
+		<dict>
+			<key>note</key>
+			<string>Toggle favorite (reached with ⌥ on the list)</string>
+			<key>xpos</key>
+			<real>670</real>
+			<key>ypos</key>
+			<real>400</real>
+		</dict>
+		<key>244F6CD2-31AD-4119-9D95-6458CE2664BE</key>
+		<dict>
+			<key>note</key>
+			<string>External trigger: toggle-power</string>
+			<key>xpos</key>
+			<real>30</real>
+			<key>ypos</key>
+			<real>1170</real>
+		</dict>
+		<key>3CC9121C-D758-4CF9-95F1-3B51528B0BC9</key>
+		<dict>
+			<key>note</key>
+			<string>Copy Bluetooth diagnostics</string>
+			<key>xpos</key>
+			<real>30</real>
+			<key>ypos</key>
+			<real>900</real>
+		</dict>
 		<key>3FF8E7D0-F1C5-4F5E-8851-C9742A4582B9</key>
 		<dict>
 			<key>note</key>
@@ -866,21 +893,21 @@ For details see the workflow GitHub page - https://github.com/bosha/alfred-bluem
 			<key>ypos</key>
 			<real>140</real>
 		</dict>
+		<key>4842229E-0BF7-462A-B9DB-0D1DBC16323B</key>
+		<dict>
+			<key>note</key>
+			<string>Confirm unpairing a device (reached with ⌃ on the list)</string>
+			<key>xpos</key>
+			<real>670</real>
+			<key>ypos</key>
+			<real>260</real>
+		</dict>
 		<key>4B66AB3E-9274-488F-903A-2C846C0DC709</key>
 		<dict>
 			<key>xpos</key>
 			<real>30</real>
 			<key>ypos</key>
 			<real>775</real>
-		</dict>
-		<key>A9B93538-4B8F-4CE9-B0CB-6753D353A738</key>
-		<dict>
-			<key>note</key>
-			<string>Open Bluetooth permission settings</string>
-			<key>xpos</key>
-			<real>455</real>
-			<key>ypos</key>
-			<real>260</real>
 		</dict>
 		<key>55DE8F2C-A3B7-4DCA-8B70-2419B08E6EF0</key>
 		<dict>
@@ -912,31 +939,6 @@ For details see the workflow GitHub page - https://github.com/bosha/alfred-bluem
 			<key>ypos</key>
 			<real>625</real>
 		</dict>
-		<key>C90C27BF-2899-45D7-8C55-D4DF84ECA712</key>
-		<dict>
-			<key>note</key>
-			<string>Turn on host bluetooth adapter</string>
-			<key>xpos</key>
-			<real>310</real>
-			<key>ypos</key>
-			<real>375</real>
-		</dict>
-		<key>F49AD98A-0D8A-4574-8A8D-A21AA143461F</key>
-		<dict>
-			<key>xpos</key>
-			<real>30</real>
-			<key>ypos</key>
-			<real>120</real>
-		</dict>
-		<key>3CC9121C-D758-4CF9-95F1-3B51528B0BC9</key>
-		<dict>
-			<key>note</key>
-			<string>Copy Bluetooth diagnostics</string>
-			<key>xpos</key>
-			<real>30</real>
-			<key>ypos</key>
-			<real>900</real>
-		</dict>
 		<key>78526B29-80D7-4FC7-8AA8-3BE2C44B2D39</key>
 		<dict>
 			<key>note</key>
@@ -955,14 +957,23 @@ For details see the workflow GitHub page - https://github.com/bosha/alfred-bluem
 			<key>ypos</key>
 			<real>1080</real>
 		</dict>
-		<key>244F6CD2-31AD-4119-9D95-6458CE2664BE</key>
+		<key>A9B93538-4B8F-4CE9-B0CB-6753D353A738</key>
 		<dict>
 			<key>note</key>
-			<string>External trigger: toggle-power</string>
+			<string>Open Bluetooth permission settings</string>
 			<key>xpos</key>
-			<real>30</real>
+			<real>455</real>
 			<key>ypos</key>
-			<real>1170</real>
+			<real>260</real>
+		</dict>
+		<key>C90C27BF-2899-45D7-8C55-D4DF84ECA712</key>
+		<dict>
+			<key>note</key>
+			<string>Turn on host bluetooth adapter</string>
+			<key>xpos</key>
+			<real>310</real>
+			<key>ypos</key>
+			<real>375</real>
 		</dict>
 		<key>D14BC437-BCD4-4BB6-BAA9-114CA20A1C79</key>
 		<dict>
@@ -973,15 +984,6 @@ For details see the workflow GitHub page - https://github.com/bosha/alfred-bluem
 			<key>ypos</key>
 			<real>1080</real>
 		</dict>
-		<key>4842229E-0BF7-462A-B9DB-0D1DBC16323B</key>
-		<dict>
-			<key>note</key>
-			<string>Confirm unpairing a device (reached with ⌃ on the list)</string>
-			<key>xpos</key>
-			<real>670</real>
-			<key>ypos</key>
-			<real>260</real>
-		</dict>
 		<key>ED82FB6E-0C7A-4EA3-94B0-D6758903D9C3</key>
 		<dict>
 			<key>note</key>
@@ -991,14 +993,12 @@ For details see the workflow GitHub page - https://github.com/bosha/alfred-bluem
 			<key>ypos</key>
 			<real>260</real>
 		</dict>
-		<key>0F92B8F4-7772-4CE1-A455-C3D22B96FABA</key>
+		<key>F49AD98A-0D8A-4574-8A8D-A21AA143461F</key>
 		<dict>
-			<key>note</key>
-			<string>Toggle favorite (reached with ⌥ on the list)</string>
 			<key>xpos</key>
-			<real>670</real>
+			<real>30</real>
 			<key>ypos</key>
-			<real>400</real>
+			<real>120</real>
 		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>
@@ -1284,7 +1284,7 @@ For details see the workflow GitHub page - https://github.com/bosha/alfred-bluem
 	<key>variablesdontexport</key>
 	<array/>
 	<key>version</key>
-	<string>0.1</string>
+	<string>0.2</string>
 	<key>webaddress</key>
 	<string>https://github.com/bosha/alfred-blueman-workflow</string>
 </dict>
