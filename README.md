@@ -1,10 +1,20 @@
 # Alfred Workflow for Controlling Bluetooth Connection
 
-This workflow enables you to manage your Bluetooth device connections and Bluetooth state directly from Alfred. It offers the following functionalities:
+This workflow enables you to manage your Bluetooth device connections and Bluetooth state directly from Alfred.
 
-- Displays a list of all paired devices with type-specific icons, connection status (connected or disconnected) and battery level when the device reports it.
-- Connects or disconnects from a paired Bluetooth device.
-- Turns Bluetooth on or off for your device.
+## Features
+
+- Lists every paired Bluetooth device with a type-specific icon (keyboard, mouse, trackpad, headphones, speaker, phone, tablet, watch, game controller, computer) and dedicated icons for AirPods, Magic devices, the Logitech MX Master lineup and Keychron.
+- Shows connection state and battery levels, including separate AirPods left/right/case levels. Battery glyphs use [SF Symbols](https://developer.apple.com/sf-symbols/) when Apple's SF Pro font is installed, with an emoji fallback (configurable).
+- Connects and disconnects devices, and unpairs them behind a confirmation (experimental).
+- Stars favorites and hides ignored devices with modifier actions, stored in editable configuration fields.
+- Sorts by Alfred's learned order, favorites, connection state, alphabetically, or the macOS order.
+- Filters by device name, and by MAC address when addresses are shown; ignored devices reappear in search so they can be un-ignored.
+- Refreshes the list while it is open, so connection and battery states stay current.
+- Turns Bluetooth on, off or toggles it, with configurable keywords and a `toggle-power` external trigger for other apps.
+- Handles the edge cases visibly: a single actionable item when Bluetooth is off, a notification when a selected device has disappeared, and guidance when the Bluetooth permission is missing.
+- Copies a diagnostics report (`btdiag`), optionally redacted with `⌥`.
+- Requires no third-party dependencies — only built-in macOS tools (JXA plus `system_profiler`).
 
 Compared to other workflows such as [alfred_bluetooth_controller](https://github.com/vegardinho/alfred_bluetooth_controller/), this one:
 
@@ -52,6 +62,9 @@ To build a distributable bundle and cut a release (`make package` / `make releas
 ## Commands
 
 - **btl**: Displays a list of all paired Bluetooth devices and their connection status. The keyword is configurable in the workflow settings.
+  - Type to filter by device name, or by MAC address when addresses are shown.
+  - The list refreshes every two seconds while it is open.
+  - If Bluetooth is off, the list shows a single item that turns it on.
   - Hold `⌥` (Option) and press `⏎` to star a favorite.
   - Hold `⌘` (Command) and press `⏎` to ignore or unignore a device.
   - Hold `⌃` (Control) and press `⏎` to unpair a device (**experimental**).
@@ -106,7 +119,7 @@ The same limitation affects other tools: [blueutil #110](https://github.com/toy/
 
 The workflow detects LE devices and reports that disconnecting them is not supported, instead of failing silently. For Classic devices it verifies that the connection actually dropped and reports an error when it did not.
 
-### Unpairing devices (experimantal)
+### Unpairing devices (experimental)
 
 Hold `⌃` (Control) and press `⏎` on a device in the `btl` list, then confirm. Unpairing removes the device from the system's paired list, so you will have to pair it again to use it.
 

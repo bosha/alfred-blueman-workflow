@@ -821,17 +821,24 @@ echo -n $query
 		</dict>
 	</array>
 	<key>readme</key>
-	<string>This workflow enables you to manage your Bluetooth device connections and Bluetooth state directly from Alfred. It offers the following functionalities:
+	<string>This workflow manages Bluetooth devices and the Bluetooth power state directly from Alfred.
 
-* Displays a list of all paired devices along with their connection status (connected or disconnected).
-* Connects or disconnects from a paired Bluetooth device.
-* Unpairs a paired device (hold ⌃ and press ⏎ on a device in the list).
-* Stars favorite devices (hold ⌥ and press ⏎) and can sort them first.
-* Hides ignored devices (hold ⌘ and press ⏎ to ignore or unignore; type a name to reveal).
-* Turns Bluetooth on or off for your device, or toggles it with btt.
-* Copies a diagnostics report (btdiag) for issue reports.
+* Lists all paired devices with type-specific icons, connection status and battery level, including separate AirPods left/right/case levels. Battery glyphs use Apple's SF Symbols when the SF Pro font is installed, with emoji fallback.
+* Connects or disconnects a paired device.
+* Unpairs a device (hold ⌃ and press ⏎; experimental).
+* Stars favorite devices (hold ⌥ and press ⏎) and sorts them first.
+* Hides ignored devices (hold ⌘ and press ⏎; type a name to reveal).
+* Filters by device name, and by MAC address when addresses are shown.
+* Refreshes the list while it is open, so connection and battery states stay current.
+* Sorts by Alfred's order, favorites, connection state, alphabetically, or the macOS order.
+* Turns Bluetooth on or off, or toggles it; all keywords are configurable.
+* Toggles Bluetooth from other apps via the toggle-power external trigger.
+* Notifies when a device disappears, Bluetooth is off, or the Bluetooth permission is missing.
+* Copies a diagnostics report (btdiag) for issue reports; hold ⌥ for a redacted copy.
 
-For details see workflow github page - https://github.com/bosha/alfred-blueman-workflow</string>
+Install Apple's SF Pro font (developer.apple.com/fonts) to render the SF Symbols battery glyphs.
+
+For details see the workflow GitHub page - https://github.com/bosha/alfred-blueman-workflow</string>
 	<key>uidata</key>
 	<dict>
 		<key>0CACB16D-41C0-4B80-A567-CA571ABD549F</key>
