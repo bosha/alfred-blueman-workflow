@@ -202,3 +202,10 @@ xcrun swift tools/generate_icons.swift
 ```
 
 Add or change entries in the `specs` array at the top of that script. BLE device types are read from the built-in `system_profiler` only when the list contains LE devices; Classic devices use their Class of Device.
+
+The workflow's own icon (`icon.png`, shown in Alfred, the Gallery and notifications) and the "Bluetooth is off" row icon come from `tools/generate_app_icon.swift`, which shares the green/gray palette with the device icons:
+
+```shell
+xcrun swift tools/generate_app_icon.swift              # icon.png and assets/off.png
+xcrun swift tools/generate_app_icon.swift --style rune # alternate look: green rune, no dot
+```

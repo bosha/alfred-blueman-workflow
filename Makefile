@@ -34,6 +34,7 @@ dev-sync:
 	@cp info.plist "$(DEV_WORKFLOW)/info.plist"
 	@cp icon.png "$(DEV_WORKFLOW)/icon.png"
 	@cp README.md "$(DEV_WORKFLOW)/README.md"
+	@cp assets/*.png "$(DEV_WORKFLOW)/assets/"
 	@cp assets/icons/*.png assets/icons/map.json "$(DEV_WORKFLOW)/assets/icons/"
 	@echo "Synced runtime files to $(DEV_WORKFLOW)"
 
