@@ -1224,6 +1224,25 @@ For details see the workflow GitHub page - https://github.com/bosha/alfred-bluem
 			<key>config</key>
 			<dict>
 				<key>default</key>
+				<true/>
+				<key>required</key>
+				<false/>
+				<key>text</key>
+				<string>Show in the btl list</string>
+			</dict>
+			<key>description</key>
+			<string>Mark devices that use Bluetooth LE (rather than Classic) in the btl list subtitle. Classic devices are left unmarked.</string>
+			<key>label</key>
+			<string>BLE marker</string>
+			<key>type</key>
+			<string>checkbox</string>
+			<key>variable</key>
+			<string>ble_marker</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
 				<string>auto</string>
 				<key>pairs</key>
 				<array>

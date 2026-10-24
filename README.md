@@ -5,7 +5,7 @@ This workflow enables you to manage your Bluetooth device connections and Blueto
 ## Features
 
 - Lists every paired Bluetooth device with a type-specific icon (keyboard, mouse, trackpad, headphones, speaker, phone, tablet, watch, game controller, computer) and dedicated icons for AirPods, Magic devices, the Logitech MX Master lineup and Keychron.
-- Shows connection state and battery levels, including separate AirPods left/right/case levels. Battery glyphs use [SF Symbols](https://developer.apple.com/sf-symbols/) when Apple's SF Pro font is installed, with an emoji fallback (configurable).
+- Shows connection state and battery levels, including separate AirPods left/right/case levels, and marks Bluetooth LE devices so it is clear which ones macOS will not let the workflow disconnect. Battery glyphs use [SF Symbols](https://developer.apple.com/sf-symbols/) when Apple's SF Pro font is installed, with an emoji fallback (configurable).
 - Connects and disconnects devices, and unpairs them behind a confirmation (experimental).
 - Stars favorites and hides ignored devices with modifier actions, stored in editable configuration fields.
 - Sorts by Alfred's learned order, favorites, connection state, alphabetically, or the macOS order.
@@ -145,7 +145,7 @@ A device that is both starred and ignored stays hidden (ignoring wins); if you r
 
 ## Settings
 
-The workflow exposes eleven configuration parameters in Alfred (Workflow -> Configure Workflow...):
+The workflow exposes twelve configuration parameters in Alfred (Workflow -> Configure Workflow...):
 
 - **List keyword** — keyword used to open the device list (default `btl`).
 - **On keyword** — keyword used to turn Bluetooth on (default `bton`).
@@ -161,6 +161,7 @@ The workflow exposes eleven configuration parameters in Alfred (Workflow -> Conf
   - `Alphabetical` — sorted by device name.
   - `Default` — keeps the macOS order.
 - **MAC addresses** — show device addresses in the `btl` list (off by default). When enabled, the list can also be filtered by address; when disabled, only device names are matched.
+- **BLE marker** — mark Bluetooth LE devices as `Connected (BLE)` / `Disconnected (BLE)` in the `btl` list (on by default). Classic devices stay unmarked, so the marker doubles as an explanation of why LE devices cannot be disconnected (see [Disconnecting devices](#disconnecting-devices)).
 - **Battery icons** — `Auto` (default), `SF Symbols`, or `Emoji`. AirPods left/right/case levels and other battery readings use SF Symbols glyphs when available; `Auto` uses them only when Apple's SF Pro font is installed, otherwise it falls back to emoji.
 - **Notifications** — `On` (default), `Only errors`, or `Off`.
 - **Logging Level** — defaults to `Info`. Useful only for development purposes.

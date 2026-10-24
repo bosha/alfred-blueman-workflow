@@ -10,6 +10,7 @@ ObjC.import("CoreText")
 const ENV_VARS = {
     ALFRED_VERSION: "alfred_version",
     BATTERY_ICONS: "battery_icons",
+    BLE_MARKER: "ble_marker",
     FAVORITES: "favorites",
     IGNORE: "ignore",
     LIST_KEYWORD: "list_keyword",
@@ -33,6 +34,13 @@ const CONFIG_SCHEMA = {
     batteryIcons: {
         env: ENV_VARS.BATTERY_ICONS,
         default: "auto",
+    },
+    bleMarker: {
+        env: ENV_VARS.BLE_MARKER,
+        // Checkbox: Alfred exports "1" or "0". Shown unless switched off, so a
+        // configuration that predates the setting keeps the marker.
+        default: "1",
+        parse: value => value === "1",
     },
     favorites: {
         env: ENV_VARS.FAVORITES,
@@ -1263,8 +1271,14 @@ class ListBtDevicesCommand extends WorkflowBase {
         let results = []
         items.forEach(device => {
             // Type icons replace the old on/off icons, so the connection state
-            // is always part of the subtitle, followed by battery/address.
-            let subtitleParts = [device.connected ? "Connected" : "Disconnected"]
+            // is always part of the subtitle, followed by battery/address. The
+            // Bluetooth LE marker rides along with the state: LE devices are
+            // the ones macOS will not let the workflow disconnect.
+            let state = device.connected ? "Connected" : "Disconnected"
+            if (this.config.bleMarker && device.isBle) {
+                state = `${state} (BLE)`
+            }
+            let subtitleParts = [state]
             let battery = formatBatteryLabel(device.battery, this.config.batteryIcons)
             if (battery) {
                 subtitleParts.push(battery)
@@ -1786,6 +1800,7 @@ class DiagnosticsCommand extends WorkflowBase {
                 + `off=${this.config.offKeyword}, toggle=${this.config.toggleKeyword}`,
             `Settings: sort_order=${this.config.sortOrder || DEFAULT_SORT_ORDER}, `
                 + `show_mac_addresses=${this.config.showMacAddresses ? "on" : "off"}, `
+                + `ble_marker=${this.config.bleMarker ? "on" : "off"}, `
                 + `battery_icons=${this.config.batteryIcons || "auto"}, `
                 + `notifications=${this.config.notifications}, `
                 + `ignored=${new Ignored(this.config.ignore).count}`,
