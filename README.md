@@ -173,6 +173,8 @@ Battery levels are shown either with emoji or with [SF Symbols](https://develope
 
 Device rows use type-specific icons for keyboards, mice, trackpads, headphones, speakers, phones, tablets, watches, game controllers and computers. AirPods, Magic Mouse/Keyboard/Trackpad, the Logitech MX Master lineup and Keychron devices have dedicated icons. Connected devices use the blue icon; disconnected devices use a muted gray `_off` variant so the connection state is visible at a glance.
 
+Every icon is drawn with a dark rim around the glyph. Alfred has no per-state icon and draws the same PNG on the theme background and on the selected row: the rim disappears on dark themes, and on light backgrounds or a saturated selection colour (the blue highlight most themes use) it keeps the glyph readable without borrowing the colour of the row text. Icons are generated at 256×256 px, four times the size Alfred draws them at.
+
 Specific-device overrides are data-driven, so adding an icon does not require code changes:
 
 1. Add a 512×512 PNG to `assets/icons/` (transparent background). The base name is used for connected devices; disconnected devices use `<name>_off.png` when it exists, otherwise the base icon.
