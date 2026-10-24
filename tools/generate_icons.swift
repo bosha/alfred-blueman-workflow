@@ -8,10 +8,10 @@
 //
 // Alfred draws the same PNG on the theme background and, for the selected row,
 // on the theme's selection colour, and its script filter API has no per-state
-// icon. A blue glyph therefore disappears on the blue selection most themes
-// use, so every icon is drawn with a dark rim: invisible on dark themes, but it
-// keeps the glyph readable on light backgrounds and on any saturated selection
-// colour without changing the icon's own colour.
+// icon. A saturated glyph therefore disappears on a selection of the same
+// colour (the blue highlight most themes use, for example), so every icon is
+// drawn with a dark rim: invisible on dark themes, but it keeps the glyph
+// readable on light backgrounds and on any saturated selection colour.
 
 import AppKit
 
@@ -22,7 +22,9 @@ let canvas: CGFloat = 512
 let pixelSize: CGFloat = 256
 // Width of the rim at the rasterised size (2px at the 64pt Alfred draws).
 let rimRadius: CGFloat = 8
-let blue = NSColor(srgbRed: 0.039, green: 0.518, blue: 1.0, alpha: 1.0)
+// Connected devices: systemGreen, which reads as "active" and stays distinct
+// from the blue selection most themes use.
+let green = NSColor(srgbRed: 0.204, green: 0.780, blue: 0.349, alpha: 1.0)
 // Opaque mid-gray so disconnected icons stay visible on light and dark themes.
 let gray = NSColor(srgbRed: 0.557, green: 0.557, blue: 0.576, alpha: 1.0)
 let white = NSColor.white
@@ -50,7 +52,7 @@ struct Spec {
     let symbol: String
     let badge: Badge?
     // When set, the icon is drawn once in this color (no `_off` variant).
-    // Device icons leave it nil and get the blue/gray variants instead.
+    // Device icons leave it nil and get the green/gray variants instead.
     let color: NSColor?
 
     init(name: String, symbol: String, badge: Badge?, color: NSColor? = nil) {
@@ -93,7 +95,7 @@ struct IconVariant {
 }
 
 let variants: [IconVariant] = [
-    IconVariant(suffix: "", color: blue),
+    IconVariant(suffix: "", color: green),
     IconVariant(suffix: "_off", color: gray),
 ]
 

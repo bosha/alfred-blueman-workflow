@@ -171,7 +171,7 @@ Battery levels are shown either with emoji or with [SF Symbols](https://develope
 
 ## Device icons
 
-Device rows use type-specific icons for keyboards, mice, trackpads, headphones, speakers, phones, tablets, watches, game controllers and computers. AirPods, Magic Mouse/Keyboard/Trackpad, the Logitech MX Master lineup and Keychron devices have dedicated icons. Connected devices use the blue icon; disconnected devices use a muted gray `_off` variant so the connection state is visible at a glance.
+Device rows use type-specific icons for keyboards, mice, trackpads, headphones, speakers, phones, tablets, watches, game controllers and computers. AirPods, Magic Mouse/Keyboard/Trackpad, the Logitech MX Master lineup and Keychron devices have dedicated icons. Connected devices use the green icon; disconnected devices use a muted gray `_off` variant so the connection state is visible at a glance.
 
 Every icon is drawn with a dark rim around the glyph. Alfred has no per-state icon and draws the same PNG on the theme background and on the selected row: the rim disappears on dark themes, and on light backgrounds or a saturated selection colour (the blue highlight most themes use) it keeps the glyph readable without borrowing the colour of the row text. Icons are generated at 256×256 px, four times the size Alfred draws them at.
 
@@ -192,7 +192,7 @@ Mapping keys are `vendor_id:product_id` in four-digit lowercase hexadecimal, wit
 
 The value is the base icon file name without `.png`. The workflow checks the specific product first, then the vendor wildcard. Device IDs are shown in System Information -> Bluetooth. If no mapping matches, the icon is selected from the device type (Classic Class of Device or `system_profiler` minor type), with a device-name fallback.
 
-The bundled generator creates both the blue base icon and the gray `_off` variant for every entry in `specs`. For a manually added icon, include both `<name>.png` and `<name>_off.png` to keep the state distinction.
+The bundled generator creates both the green base icon and the gray `_off` variant for every entry in `specs`. For a manually added icon, include both `<name>.png` and `<name>_off.png` to keep the state distinction.
 
 To regenerate the bundled icons from SF Symbols, run:
 
