@@ -1303,7 +1303,7 @@ For details see the workflow GitHub page - https://github.com/bosha/alfred-bluem
 	<key>variablesdontexport</key>
 	<array/>
 	<key>version</key>
-	<string>0.2.1</string>
+	<string>0.2.2</string>
 	<key>webaddress</key>
 	<string>https://github.com/bosha/alfred-blueman-workflow</string>
 </dict>
