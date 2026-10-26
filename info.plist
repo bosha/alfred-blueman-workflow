@@ -221,6 +221,72 @@
 				<false/>
 			</dict>
 		</array>
+		<key>08051045-362D-4DA8-A8DD-0BAB60C6F3D1</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>A9B93538-4B8F-4CE9-B0CB-6753D353A738</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>2B5DB0D5-9A8C-460A-82A4-D60FECA45E31</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>B1A2E1E3-8A5A-4115-813E-8CBB0F1CD6BB</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>AB540A9F-12F1-4D30-9A37-59DACF7CDB55</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>0ADC2B94-D6E8-4B2D-AC6E-DC1BA6B4D501</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+			<dict>
+				<key>destinationuid</key>
+				<string>C90C27BF-2899-45D7-8C55-D4DF84ECA712</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>sourceoutputuid</key>
+				<string>540933E2-5D3A-497E-BA1A-F1B4D82370E2</string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>AB540A9F-12F1-4D30-9A37-59DACF7CDB55</key>
+		<array/>
+		<key>B17AF933-FD81-4FC4-B42B-ED3B19DE085E</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>08051045-362D-4DA8-A8DD-0BAB60C6F3D1</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>modifiersubtext</key>
+				<string></string>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+		<key>B1A2E1E3-8A5A-4115-813E-8CBB0F1CD6BB</key>
+		<array/>
 	</dict>
 	<key>createdby</key>
 	<string>Bosha</string>
@@ -819,6 +885,161 @@ echo -n $query
 			<key>version</key>
 			<integer>2</integer>
 		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>alfredfiltersresults</key>
+				<false/>
+				<key>alfredfiltersresultsmatchmode</key>
+				<integer>0</integer>
+				<key>argumenttreatemptyqueryasnil</key>
+				<true/>
+				<key>argumenttrimmode</key>
+				<integer>0</integer>
+				<key>argumenttype</key>
+				<integer>1</integer>
+				<key>escaping</key>
+				<integer>68</integer>
+				<key>keyword</key>
+				<string>{var:pair_keyword}</string>
+				<key>queuedelaycustom</key>
+				<integer>3</integer>
+				<key>queuedelayimmediatelyinitially</key>
+				<true/>
+				<key>queuedelaymode</key>
+				<integer>0</integer>
+				<key>queuemode</key>
+				<integer>1</integer>
+				<key>runningsubtext</key>
+				<string>Searching for nearby devices…</string>
+				<key>script</key>
+				<string>/usr/bin/osascript -l JavaScript ./src/bt_manager.jxa pair-list "$1"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>subtext</key>
+				<string>Pair a new Bluetooth device</string>
+				<key>title</key>
+				<string>Pair Bluetooth Device</string>
+				<key>type</key>
+				<integer>0</integer>
+				<key>withspace</key>
+				<true/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.scriptfilter</string>
+			<key>uid</key>
+			<string>B17AF933-FD81-4FC4-B42B-ED3B19DE085E</string>
+			<key>version</key>
+			<integer>3</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>conditions</key>
+				<array>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>__PAIR_RESCAN__</string>
+						<key>outputlabel</key>
+						<string>Scan again</string>
+						<key>uid</key>
+						<string>0ADC2B94-D6E8-4B2D-AC6E-DC1BA6B4D501</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>turn-on</string>
+						<key>outputlabel</key>
+						<string>Turn on Bluetooth</string>
+						<key>uid</key>
+						<string>540933E2-5D3A-497E-BA1A-F1B4D82370E2</string>
+					</dict>
+					<dict>
+						<key>inputstring</key>
+						<string></string>
+						<key>matchcasesensitive</key>
+						<false/>
+						<key>matchmode</key>
+						<integer>0</integer>
+						<key>matchstring</key>
+						<string>__OPEN_BLUETOOTH_PERMISSION_SETTINGS__</string>
+						<key>outputlabel</key>
+						<string>Open Bluetooth permission settings</string>
+						<key>uid</key>
+						<string>2B5DB0D5-9A8C-460A-82A4-D60FECA45E31</string>
+					</dict>
+				</array>
+				<key>elselabel</key>
+				<string>Pair device</string>
+				<key>hideelse</key>
+				<false/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.utility.conditional</string>
+			<key>uid</key>
+			<string>08051045-362D-4DA8-A8DD-0BAB60C6F3D1</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>/usr/bin/osascript -l JavaScript ./src/bt_manager.jxa pair "$1"</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>B1A2E1E3-8A5A-4115-813E-8CBB0F1CD6BB</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>/usr/bin/osascript -l JavaScript ./src/bt_manager.jxa pair-rescan</string>
+				<key>scriptargtype</key>
+				<integer>1</integer>
+				<key>scriptfile</key>
+				<string></string>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>AB540A9F-12F1-4D30-9A37-59DACF7CDB55</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
 	</array>
 	<key>readme</key>
 	<string>This workflow manages Bluetooth devices and the Bluetooth power state directly from Alfred.
@@ -826,6 +1047,7 @@ echo -n $query
 * Lists all paired devices with type-specific icons, connection status and battery level, including separate AirPods left/right/case levels. Battery glyphs use Apple's SF Symbols when the SF Pro font is installed, with emoji fallback.
 * Connects or disconnects a paired device.
 * Unpairs a device (hold ⌃ and press ⏎; experimental).
+* Pairs a new Classic Bluetooth device (btpair; experimental; Bluetooth LE devices must be paired in System Settings).
 * Stars favorite devices (hold ⌥ and press ⏎) and sorts them first.
 * Hides ignored devices (hold ⌘ and press ⏎; type a name to reveal).
 * Filters by device name, and by MAC address when addresses are shown.
@@ -1000,6 +1222,42 @@ For details see the workflow GitHub page - https://github.com/bosha/alfred-bluem
 			<key>ypos</key>
 			<real>120</real>
 		</dict>
+		<key>08051045-362D-4DA8-A8DD-0BAB60C6F3D1</key>
+		<dict>
+			<key>note</key>
+			<string>Route btpair actions: scan again, turn on, permission, pair</string>
+			<key>xpos</key>
+			<real>245</real>
+			<key>ypos</key>
+			<real>1310</real>
+		</dict>
+		<key>AB540A9F-12F1-4D30-9A37-59DACF7CDB55</key>
+		<dict>
+			<key>note</key>
+			<string>Clear the cached pairing scan and reopen btpair</string>
+			<key>xpos</key>
+			<real>455</real>
+			<key>ypos</key>
+			<real>1390</real>
+		</dict>
+		<key>B17AF933-FD81-4FC4-B42B-ED3B19DE085E</key>
+		<dict>
+			<key>note</key>
+			<string>btpair: pair a new Bluetooth device</string>
+			<key>xpos</key>
+			<real>30</real>
+			<key>ypos</key>
+			<real>1290</real>
+		</dict>
+		<key>B1A2E1E3-8A5A-4115-813E-8CBB0F1CD6BB</key>
+		<dict>
+			<key>note</key>
+			<string>Pair and connect the selected device</string>
+			<key>xpos</key>
+			<real>455</real>
+			<key>ypos</key>
+			<real>1290</real>
+		</dict>
 	</dict>
 	<key>userconfigurationconfig</key>
 	<array>
@@ -1086,6 +1344,27 @@ For details see the workflow GitHub page - https://github.com/bosha/alfred-bluem
 			<string>textfield</string>
 			<key>variable</key>
 			<string>toggle_keyword</string>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>default</key>
+				<string>btpair</string>
+				<key>placeholder</key>
+				<string></string>
+				<key>required</key>
+				<true/>
+				<key>trim</key>
+				<true/>
+			</dict>
+			<key>description</key>
+			<string>Keyword used to pair a new Bluetooth device</string>
+			<key>label</key>
+			<string>Pair keyword</string>
+			<key>type</key>
+			<string>textfield</string>
+			<key>variable</key>
+			<string>pair_keyword</string>
 		</dict>
 		<dict>
 			<key>config</key>

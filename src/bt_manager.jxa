@@ -18,10 +18,13 @@ const ENV_VARS = {
     NOTIFICATIONS: "notifications",
     OFF_KEYWORD: "off_keyword",
     ON_KEYWORD: "on_keyword",
+    PAIR_KEYWORD: "pair_keyword",
     SORT_ORDER: "sort_order",
     SHOW_MAC_ADDRESSES: "show_mac_addresses",
     TOGGLE_KEYWORD: "toggle_keyword",
     WORKFLOW_BUNDLE_ID: "alfred_workflow_bundleid",
+    WORKFLOW_CACHE: "alfred_workflow_cache",
+    WORKFLOW_DATA: "alfred_workflow_data",
     WORKFLOW_VERSION: "alfred_workflow_version",
 }
 
@@ -59,6 +62,10 @@ const CONFIG_SCHEMA = {
     onKeyword: {
         env: ENV_VARS.ON_KEYWORD,
         default: "bton",
+    },
+    pairKeyword: {
+        env: ENV_VARS.PAIR_KEYWORD,
+        default: "btpair",
     },
     toggleKeyword: {
         env: ENV_VARS.TOGGLE_KEYWORD,
@@ -249,6 +256,177 @@ class SimpleLogger {
     }
 }
 
+// Pairing and discovery budget. An inquiry cannot be resumed across processes
+// and short inquiries never give devices enough time to answer, so `btpair`
+// runs a single inquiry and caches its result (see PairScanCache below).
+const PAIR_SCAN_SECONDS = 10
+const PAIR_SCAN_CACHE_SECONDS = 10
+const PAIR_SCAN_CACHE_FILE = "pair-scan.json"
+const PAIR_TIMEOUT_SECONDS = 60
+const PAIR_CONNECT_TIMEOUT_SECONDS = 10
+// Pseudo argument used by the `btpair` list for its "scan again" action
+const PAIR_RESCAN_ARG = "__PAIR_RESCAN__"
+
+const DEVICE_TYPE_LABELS = {
+    "bluetooth": "Bluetooth device",
+    "keyboard": "Keyboard",
+    "mouse": "Mouse",
+    "trackpad": "Trackpad",
+    "headphones": "Headphones",
+    "speaker": "Speaker",
+    "gamecontroller": "Game controller",
+    "watch": "Watch",
+    "tablet": "Tablet",
+    "phone": "Phone",
+    "computer": "Computer",
+}
+
+// HCI error codes returned by IOBluetoothDevicePair (the same table blueutil
+// uses). Only the codes that can realistically show up while pairing.
+const PAIRING_ERROR_DESCRIPTIONS = {
+    0x01: "Unknown HCI command",
+    0x02: "No connection",
+    0x03: "Hardware failure",
+    0x04: "Page timeout — the device did not respond",
+    0x05: "Authentication failure",
+    0x06: "Key missing",
+    0x07: "Memory full",
+    0x08: "Connection timeout",
+    0x09: "Maximum number of connections reached",
+    0x0a: "Maximum number of synchronous connections reached",
+    0x0b: "ACL connection already exists",
+    0x0c: "Command disallowed",
+    0x0d: "Host rejected due to limited resources",
+    0x0e: "Host rejected due to security reasons",
+    0x0f: "Host rejected the device",
+    0x10: "Host timeout",
+    0x11: "Unsupported feature or parameter value",
+    0x12: "Invalid HCI command parameters",
+    0x13: "Remote device ended the connection",
+    0x16: "Connection terminated by the local host",
+    0x17: "Repeated attempts",
+    0x18: "Pairing not allowed",
+    0x19: "Unknown LMP PDU",
+    0x1a: "Unsupported remote feature",
+    0x1f: "Unspecified error",
+    0x22: "LMP response timeout",
+    0x23: "LMP error transaction collision",
+    0x24: "LMP PDU not allowed",
+    0x29: "Pairing with a unit key is not supported",
+    0x37: "Secure Simple Pairing is not supported by the host",
+    0x38: "Host busy pairing",
+    0x3a: "Controller busy",
+    0x3e: "Connection failed to be established",
+}
+
+function pairingErrorDescription(code) {
+    if (code === null || code === undefined) {
+        return "unknown error"
+    }
+    let number = Number(code)
+    if (!Number.isFinite(number)) {
+        return "unknown error"
+    }
+    let description = PAIRING_ERROR_DESCRIPTIONS[number]
+    let hex = `0x${number.toString(16).padStart(2, "0")}`
+    return description ? `${description} (${hex})` : `error ${hex}`
+}
+
+// State shared with the Objective-C pairing delegate. JXA can only register a
+// delegate class once per process, so its methods route callbacks through this
+// mutable session object instead of capturing a specific attempt.
+let pairingSession = null
+
+const PAIRING_DELEGATE_CLASS_NAME = "BluemanPairingDelegate"
+
+// IOBluetoothDevicePairDelegate is not registered at runtime (only the header
+// declares it), so the subclass is registered without `protocols` and provides
+// the selectors it needs. Verified on macOS 26/27: the callbacks fire.
+let pairingDelegateClass = null
+
+function ensurePairingDelegateClass() {
+    // Do not probe with NSClassFromString: before the class exists the bridge
+    // returns a function stub, which looks truthy but has no ObjC methods
+    if (pairingDelegateClass !== null) {
+        return pairingDelegateClass
+    }
+
+    ObjC.registerSubclass({
+        name: PAIRING_DELEGATE_CLASS_NAME,
+        superclass: "NSObject",
+        methods: {
+            "devicePairingStarted:": {
+                types: ["void", ["id"]],
+                implementation: function (pair) {
+                    // The macOS 26+ shim may report the start more than once
+                    log.debug("pairing: started")
+                }
+            },
+            "devicePairingConnecting:": {
+                types: ["void", ["id"]],
+                implementation: function (pair) {
+                    log.debug("pairing: connecting")
+                }
+            },
+            "devicePairingPINCodeRequest:": {
+                types: ["void", ["id"]],
+                implementation: function (pair) {
+                    // Replying needs a pointer to a BluetoothPINCode C struct,
+                    // which the JXA bridge cannot construct. Record the request
+                    // so the pairing attempt can be stopped with a clear message.
+                    log.error("pairing: the device requested a legacy PIN code")
+                    if (pairingSession !== null) {
+                        pairingSession.pinRequested = true
+                    }
+                }
+            },
+            "devicePairingUserConfirmationRequest:numericValue:": {
+                types: ["void", ["id", "unsigned int"]],
+                implementation: function (pair, numericValue) {
+                    let confirmed = false
+                    if (pairingSession !== null && pairingSession.onConfirm) {
+                        try {
+                            confirmed = pairingSession.onConfirm(Number(numericValue)) === true
+                        } catch (e) {
+                            log.error(`could not confirm the pairing code: ${e}`)
+                        }
+                    }
+                    try {
+                        pair.replyUserConfirmation(confirmed)
+                    } catch (e) {
+                        log.error(`could not reply to the pairing confirmation: ${e}`)
+                    }
+                }
+            },
+            "devicePairingUserPasskeyNotification:passkey:": {
+                types: ["void", ["id", "unsigned int"]],
+                implementation: function (pair, passkey) {
+                    if (pairingSession !== null && pairingSession.onPasskey) {
+                        try {
+                            pairingSession.onPasskey(Number(passkey))
+                        } catch (e) {
+                            log.error(`could not show the pairing passkey: ${e}`)
+                        }
+                    }
+                }
+            },
+            "devicePairingFinished:error:": {
+                types: ["void", ["id", "int"]],
+                implementation: function (pair, error) {
+                    if (pairingSession === null) {
+                        return
+                    }
+                    pairingSession.error = Number(error)
+                    pairingSession.finished = true
+                }
+            }
+        }
+    })
+
+    pairingDelegateClass = $.NSClassFromString(PAIRING_DELEGATE_CLASS_NAME)
+    return pairingDelegateClass
+}
+
 class BtManager {
     constructor(currentApp, doShellScript) {
         if (!currentApp || !doShellScript) {
@@ -258,6 +436,8 @@ class BtManager {
         this.currentApp = currentApp
         this.doShellScript = doShellScript
         this.controller = null
+        // Keeps the inquiry delegate referenced while the scan runs
+        this._inquiryDelegate = null
     }
 
     getPairedDevicesObjs() {
@@ -365,6 +545,192 @@ class BtManager {
             }
         }
         return null
+    }
+
+    // Resolve an unpaired device by its address. `deviceWithAddressString`
+    // returns an object even for an address that is not in range; pairing and
+    // connecting then report the failure through their normal result codes.
+    getDeviceByAddress(address) {
+        if (!address) {
+            return null
+        }
+
+        let addressKey = this._normalizeAddress(address)
+        if (addressKey === null) {
+            return null
+        }
+
+        let device = null
+        try {
+            device = $.IOBluetoothDevice.deviceWithAddressString(address)
+        } catch (e) {
+            log.debug(`could not resolve the device at "${address}": ${e}`)
+            return null
+        }
+        if (!device) {
+            return null
+        }
+
+        let name = null
+        try {
+            name = ObjC.unwrap(device.name)
+        } catch (e) {
+            name = null
+        }
+        if (name === undefined || name === null || String(name).trim() === "") {
+            name = null
+        }
+
+        return {
+            "name": name,
+            "address": ObjC.unwrap(device.addressString) || address,
+            "addressKey": addressKey,
+            "instance": device,
+        }
+    }
+
+    // Addresses of every paired device, keyed by the normalized address. Used
+    // to keep already-paired devices out of the pairing list.
+    getPairedAddressKeys() {
+        let keys = {}
+        this.getPairedDevicesObjs().forEach(device => {
+            try {
+                let addressKey = this._normalizeAddress(
+                    ObjC.unwrap(device.addressString))
+                if (addressKey !== null) {
+                    keys[addressKey] = true
+                }
+            } catch (e) {
+                log.debug(`could not read a paired device address: ${e}`)
+            }
+        })
+        return keys
+    }
+
+    // Run one Classic (BR/EDR) inquiry and return the devices that answered.
+    // Bluetooth LE peripherals are not reported here: the LE mode of
+    // IOBluetoothDeviceInquiry returns nothing useful on macOS 26+, and
+    // CoreBluetooth exposes per-Mac UUIDs that cannot be paired through
+    // IOBluetoothDevicePair.
+    discoverDevices(durationSec = PAIR_SCAN_SECONDS) {
+        let inquiry = null
+        // The inquiry does not retain its delegate: keep the object referenced
+        // for the whole scan, otherwise the bridge releases it and the inquiry
+        // crashes when it delivers its first callback
+        let inquiryDelegate = $.NSObject.alloc.init
+        try {
+            inquiry = $.IOBluetoothDeviceInquiry.alloc
+                .initWithDelegate(inquiryDelegate)
+        } catch (e) {
+            return { "devices": [], "error": `could not create a Bluetooth inquiry: ${e}` }
+        }
+
+        log.debug("bluetooth inquiry created")
+
+        try {
+            // Resolve names while the inquiry runs instead of showing address
+            // strings until the device gets paired
+            inquiry.updateNewDeviceNames = true
+        } catch (e) {
+            log.debug(`could not enable device name updates: ${e}`)
+        }
+
+        log.debug("bluetooth inquiry configured")
+
+        let startResult = null
+        try {
+            // Zero-argument selector invoked through property access
+            startResult = inquiry.start
+        } catch (e) {
+            return { "devices": [], "error": `could not start a Bluetooth inquiry: ${e}` }
+        }
+        if (startResult !== undefined && Number(startResult) !== 0) {
+            return { "devices": [], "error": `could not start a Bluetooth inquiry (${startResult})` }
+        }
+
+        log.debug(`bluetooth inquiry started (${startResult})`)
+
+        let devicesByAddress = {}
+        let collect = () => {
+            let found = []
+            try {
+                found = ObjC.unwrap(inquiry.foundDevices) || []
+            } catch (e) {
+                log.debug(`could not read the inquiry results: ${e}`)
+                return
+            }
+
+            Array.from(found, object => {
+                let device = this._inquiryDevice(object)
+                if (device === null) {
+                    return
+                }
+                let previous = devicesByAddress[device.addressKey]
+                if (previous === undefined) {
+                    devicesByAddress[device.addressKey] = device
+                    return
+                }
+                // Names (and the paired flag) are filled in over time
+                if (!previous.name && device.name) {
+                    previous.name = device.name
+                }
+                previous.isPaired = device.isPaired
+            })
+        }
+
+        let deadline = $.NSDate.dateWithTimeIntervalSinceNow(durationSec)
+        while (deadline.timeIntervalSinceNow > 0) {
+            collect()
+            $.NSRunLoop.currentRunLoop.runUntilDate(
+                $.NSDate.dateWithTimeIntervalSinceNow(0.25))
+        }
+        collect()
+
+        try {
+            inquiry.stop
+        } catch (e) {
+            log.debug(`could not stop the Bluetooth inquiry: ${e}`)
+        }
+
+        let devices = Object.keys(devicesByAddress)
+            .map(key => devicesByAddress[key])
+        log.debug(`the inquiry found '${devices.length}' bluetooth devices`)
+        // Referencing the delegate here keeps it alive for the whole scan
+        this._inquiryDelegate = inquiryDelegate
+        return { "devices": devices, "error": null }
+    }
+
+    _inquiryDevice(object) {
+        let address = null
+        try {
+            address = ObjC.unwrap(object.addressString)
+        } catch (e) {
+            return null
+        }
+
+        let addressKey = this._normalizeAddress(address)
+        if (addressKey === null) {
+            return null
+        }
+
+        let name = null
+        try {
+            name = ObjC.unwrap(object.name)
+        } catch (e) {
+            name = null
+        }
+        if (name === undefined || name === null || String(name).trim() === "") {
+            name = null
+        }
+
+        return {
+            "address": address,
+            "addressKey": addressKey,
+            "name": name,
+            "deviceClassMajor": Number(ObjC.unwrap(object.deviceClassMajor)),
+            "deviceClassMinor": Number(ObjC.unwrap(object.deviceClassMinor)),
+            "isPaired": ObjC.unwrap(object.isPaired) === true,
+        }
     }
 
     // `system_profiler` is the only source that exposes a usable device type
@@ -495,6 +861,97 @@ class BtManager {
         // Pre-Tahoe JXA bridge: zero-argument methods are invoked by plain
         // property access
         device.instance.openConnection
+    }
+
+    // Pair with an unpaired Classic (BR/EDR) device. Pairing is asynchronous:
+    // the delegate callbacks arrive while the run loop is serviced, so the
+    // process has to stay alive until `devicePairingFinished:error:` fires.
+    //
+    // Returns { status, error } where status is:
+    //   "ok"           - pairing succeeded
+    //   "failed"       - the stack reported an error or the device stayed unpaired
+    //   "timeout"      - no completion callback within PAIR_TIMEOUT_SECONDS
+    //   "pin-required" - a legacy PIN was requested (not supported in JXA)
+    pairDevice(device, { onConfirm = null, onPasskey = null } = {}) {
+        let delegateClass = ensurePairingDelegateClass()
+        if (!delegateClass) {
+            log.error("could not register the pairing delegate")
+            return { "status": "failed", "error": null }
+        }
+
+        let pair = null
+        try {
+            pair = $.IOBluetoothDevicePair.pairWithDevice(device.instance)
+        } catch (e) {
+            log.error(`could not create a pairing request: ${e}`)
+            return { "status": "failed", "error": null }
+        }
+        if (!pair) {
+            return { "status": "failed", "error": null }
+        }
+
+        // The pair object does not retain its delegate either: keep the object
+        // referenced through the session until the attempt finishes
+        let delegate = delegateClass.alloc.init
+        pairingSession = {
+            "finished": false,
+            "pinRequested": false,
+            "error": null,
+            "delegate": delegate,
+            "onConfirm": onConfirm,
+            "onPasskey": onPasskey,
+        }
+
+        try {
+            pair.delegate = delegate
+        } catch (e) {
+            log.debug(`could not set the pairing delegate: ${e}`)
+        }
+
+        let startResult = null
+        try {
+            // Zero-argument selector invoked through property access. On
+            // macOS 26+ this returns before pairing completes and the
+            // delegate callbacks deliver the result.
+            startResult = pair.start
+        } catch (e) {
+            log.error(`could not start pairing: ${e}`)
+            pairingSession = null
+            return { "status": "failed", "error": null }
+        }
+        if (startResult !== undefined && Number(startResult) !== 0) {
+            pairingSession = null
+            return { "status": "failed", "error": Number(startResult) }
+        }
+
+        let session = pairingSession
+        waitFor(() => session.finished || session.pinRequested, PAIR_TIMEOUT_SECONDS, 0.2)
+
+        try {
+            pair.stop
+        } catch (e) {
+            log.debug(`could not stop the pairing request: ${e}`)
+        }
+
+        let result
+        if (session.finished) {
+            result = session.error === 0
+                ? { "status": "ok", "error": 0 }
+                : { "status": "failed", "error": session.error }
+        } else if (session.pinRequested) {
+            result = { "status": "pin-required", "error": null }
+        } else {
+            result = { "status": "timeout", "error": null }
+        }
+
+        // A finished callback alone does not mean the device is paired
+        if (result.status === "ok"
+            && !waitFor(() => ObjC.unwrap(device.instance.isPaired), 3)) {
+            result = { "status": "failed", "error": null }
+        }
+
+        pairingSession = null
+        return result
     }
 
     // Last-known battery levels from the IOBluetooth device object; 0 means
@@ -1004,6 +1461,116 @@ class Ignored extends NamedList {
     }
 }
 
+// Result of the last `btpair` inquiry. A Script Filter cannot keep an inquiry
+// running between invocations, and starting a new one on every keystroke never
+// gives devices enough time to answer, so the scan result is cached in Alfred's
+// workflow data folder and reused while the list is open (and while filtering).
+class PairScanCache {
+    constructor(directory) {
+        this.directory = directory
+        this.path = directory ? `${directory}/${PAIR_SCAN_CACHE_FILE}` : null
+    }
+
+    static getDirectory() {
+        // `alfred_workflow_data` is created by Alfred for every script it runs;
+        // the cache folder and /tmp are fallbacks for manual runs only
+        return Config.getEnv(ENV_VARS.WORKFLOW_DATA)
+            || Config.getEnv(ENV_VARS.WORKFLOW_CACHE)
+            || null
+    }
+
+    read() {
+        if (this.path === null) {
+            return null
+        }
+
+        try {
+            let data = $.NSData.dataWithContentsOfFile(this.path)
+            if (data === null || data === undefined) {
+                return null
+            }
+            let text = ObjC.unwrap(
+                $.NSString.alloc.initWithDataEncoding(data, $.NSUTF8StringEncoding))
+            if (!text) {
+                return null
+            }
+            let parsed = JSON.parse(text)
+            if (parsed === null || typeof parsed !== "object"
+                || !Array.isArray(parsed.devices)) {
+                return null
+            }
+            return parsed
+        } catch (e) {
+            log.debug(`could not read the pairing scan cache: ${e}`)
+            return null
+        }
+    }
+
+    write(devices) {
+        if (this.path === null) {
+            return false
+        }
+
+        try {
+            let manager = $.NSFileManager.defaultManager
+            if (this.directory && !manager.fileExistsAtPath(this.directory)) {
+                manager.createDirectoryAtPathWithIntermediateDirectoriesAttributesError(
+                    this.directory, true, $(), $())
+            }
+
+            let text = JSON.stringify({
+                "scannedAt": Date.now(),
+                "devices": devices,
+            })
+            let written = $.NSString.alloc.initWithUTF8String(text)
+                .writeToFileAtomicallyEncodingError(
+                    this.path, true, $.NSUTF8StringEncoding, $())
+            return written === true
+        } catch (e) {
+            log.debug(`could not write the pairing scan cache: ${e}`)
+            return false
+        }
+    }
+
+    static isStale(snapshot) {
+        if (snapshot === null) {
+            return true
+        }
+        let scannedAt = Number(snapshot.scannedAt)
+        if (!Number.isFinite(scannedAt)) {
+            return true
+        }
+        return Date.now() - scannedAt > PAIR_SCAN_CACHE_SECONDS * 1000
+    }
+
+    find(addressKey) {
+        let snapshot = this.read()
+        if (snapshot === null) {
+            return null
+        }
+        return snapshot.devices.find(device => device.addressKey === addressKey) || null
+    }
+
+    remove(addressKey) {
+        let snapshot = this.read()
+        if (snapshot === null) {
+            return
+        }
+        this.write(snapshot.devices.filter(device => device.addressKey !== addressKey))
+    }
+
+    clear() {
+        if (this.path === null) {
+            return
+        }
+        try {
+            $.NSFileManager.defaultManager.removeItemAtPathError(this.path, $())
+        } catch (e) {
+            log.debug(`could not remove the pairing scan cache: ${e}`)
+        }
+    }
+}
+
 class WorkflowError extends Error {
 	constructor(title, subtitle, ...params) {
 		super(...params)
@@ -1203,8 +1770,8 @@ class ListBtDevicesCommand extends WorkflowBase {
         if (items.length === 0) {
             log.debug("no paired devices found")
             return this.returnErr(
-                "No paired devices found", 
-                "You might want to pair device before using this workflow"
+                "No paired devices found",
+                `Run ${this.config.pairKeyword} to pair a device first`
             )
         }
 
@@ -1548,6 +2115,394 @@ class UnpairDeviceCommand extends WorkflowBase {
     }
 }
 
+// First step of the pairing flow. `btpair` runs a single Classic inquiry (only
+// when the cached scan is missing or stale) and renders the unpaired devices it
+// found. Pairing itself is a separate Run Script action so that the long
+// handshake does not have to fit into a Script Filter invocation.
+class PairListCommand extends WorkflowBase {
+    run() {
+        log.debug("running pair list command")
+        let mgr = new BtManager(this.currentApp, this.doShellScript.bind(this))
+        if (!mgr.hasBluetoothPermission()) {
+            log.error("bluetooth permission is missing for the app hosting this workflow (usually Alfred). See workflow README")
+            return this.returnPermissionError()
+        }
+
+        if (!mgr.isBluetoothOn()) {
+            log.debug("bluetooth is off, offering to turn it on")
+            return this.returnResult([
+                {
+                    "uid": "bt-power-off",
+                    "title": "Bluetooth is off",
+                    "subtitle": "Press Enter to turn Bluetooth on",
+                    "icon": {
+                        "path": "./assets/off.png"
+                    },
+                    "arg": "turn-on",
+                }
+            ])
+        }
+
+        let query = this.args.at(1)
+        let hasQuery = query !== null && query !== undefined
+            && String(query).trim() !== ""
+
+        let cache = new PairScanCache(PairScanCache.getDirectory())
+        let snapshot = cache.read()
+        // Filtering must never block on the radio: only an empty query starts
+        // a scan. An empty result is always rescanned when the list is opened
+        // again (the device may have entered pairing mode right after the scan),
+        // while a non-empty result is reused until it goes stale.
+        let needsScan = snapshot === null
+            || (!hasQuery && (snapshot.devices.length === 0
+                || PairScanCache.isStale(snapshot)))
+        if (needsScan) {
+            log.debug(`scanning for pairable devices for ${PAIR_SCAN_SECONDS}s`)
+            let scan = mgr.discoverDevices(PAIR_SCAN_SECONDS)
+            if (scan.error !== null) {
+                log.error(`could not scan for bluetooth devices: ${scan.error}`)
+                return this.returnErr(
+                    "Could not scan for Bluetooth devices",
+                    String(scan.error)
+                )
+            }
+            // Keep the result in memory even if the cache file cannot be
+            // written, so the scan is never thrown away
+            snapshot = { "scannedAt": Date.now(), "devices": scan.devices }
+            cache.write(scan.devices)
+        }
+
+        let devices = this.pairableDevices(mgr, snapshot.devices)
+        if (hasQuery) {
+            devices = this.filterByQuery(devices, query)
+        }
+
+        let showAddresses = this.config.showMacAddresses
+        let enricher = new DeviceEnricher(this.getWorkflowRoot())
+        let results = devices.map(
+            device => this.renderDevice(enricher, device, showAddresses))
+
+        if (results.length === 0) {
+            if (hasQuery) {
+                return this.returnErr(
+                    "No matching devices",
+                    `No pairable devices matching "${query}"`
+                )
+            }
+            results.push({
+                "uid": "pair-rescan",
+                "title": "No pairable devices found",
+                "subtitle": `Scanned for ${PAIR_SCAN_SECONDS}s, nothing found — power-cycle the device, then press ⏎ to scan again. Bluetooth LE devices must be paired in System Settings`,
+                "icon": {
+                    "path": "./assets/icons/bluetooth_off.png"
+                },
+                "arg": PAIR_RESCAN_ARG,
+            })
+        } else if (!hasQuery) {
+            results.push({
+                "uid": "pair-rescan",
+                "title": "Scan again",
+                "subtitle": "Look for pairable Bluetooth devices once more",
+                "icon": {
+                    "path": "./assets/icons/bluetooth.png"
+                },
+                "arg": PAIR_RESCAN_ARG,
+            })
+        }
+
+        return this.returnResult(results)
+    }
+
+    // Already-paired devices are filtered out both by the flag the inquiry
+    // reports and by the system's paired list, which is more reliable on the
+    // macOS 26+ shim.
+    pairableDevices(mgr, devices) {
+        let paired = mgr.getPairedAddressKeys()
+        return devices
+            .filter(device => !device.isPaired && paired[device.addressKey] !== true)
+            .sort((a, b) => {
+                if (a.name && b.name) {
+                    return a.name.localeCompare(
+                        b.name, undefined, { sensitivity: "base" })
+                }
+                if (a.name) {
+                    return -1
+                }
+                if (b.name) {
+                    return 1
+                }
+                return a.addressKey.localeCompare(b.addressKey)
+            })
+    }
+
+    filterByQuery(devices, query) {
+        let text = String(query).trim().toLowerCase()
+        // An address can be typed with or without separators. Requiring at
+        // least four hex digits keeps a single letter ("a") from matching every
+        // address, and non-hex text never reaches the address branch.
+        let address = ""
+        if (/^[0-9a-f:\- ]+$/.test(text)
+            && text.replace(/[^0-9a-f]/g, "").length >= 4) {
+            address = text.replace(/[^0-9a-f]/g, "")
+        }
+
+        return devices.filter(device => {
+            if (device.name && device.name.toLowerCase().includes(text)) {
+                return true
+            }
+            return address !== "" && device.addressKey.includes(address)
+        })
+    }
+
+    renderDevice(enricher, device, showAddresses) {
+        let title = device.name || `Unknown device (${device.address})`
+        let enriched = enricher.enrich([
+            {
+                "name": title,
+                "address": device.address,
+                "addressKey": device.addressKey,
+                // Actionable rows use the normal icon, not the muted `_off` one
+                "connected": true,
+                "isBle": false,
+                "minorType": null,
+                "vendorID": null,
+                "productID": null,
+                "deviceClassMajor": device.deviceClassMajor,
+                "deviceClassMinor": device.deviceClassMinor,
+            }
+        ])[0]
+
+        let subtitleParts = ["Not paired"]
+        let typeLabel = DEVICE_TYPE_LABELS[enriched.type]
+        if (typeLabel && enriched.type !== "bluetooth") {
+            subtitleParts.push(typeLabel)
+        }
+        if (showAddresses || !device.name) {
+            subtitleParts.push(device.address)
+        }
+
+        return {
+            "uid": device.address,
+            "title": title,
+            "subtitle": subtitleParts.join(" · "),
+            "icon": {
+                "path": enriched.icon
+            },
+            "arg": device.address,
+            "text": {
+                "copy": device.address,
+                "largetype": title,
+            },
+        }
+    }
+}
+
+// Second step of the pairing flow: pairs with the device selected in `btpair`
+// and connects it. Pairing can take several seconds and may ask the user to
+// confirm a numeric code, so this runs as a Run Script action where the process
+// is allowed to live until the delegate reports completion.
+class PairDeviceCommand extends WorkflowBase {
+    run() {
+        log.debug("running pair command")
+        if (!this.ensureBluetoothPermission()) {
+            return
+        }
+
+        let mgr = new BtManager(this.currentApp, this.doShellScript.bind(this))
+        if (!mgr.isBluetoothOn()) {
+            log.error("cannot pair while bluetooth is off")
+            this.notify(
+                "Turn Bluetooth on to pair a device",
+                {withTitle: "Blueman", subtitle: "Bluetooth is off"},
+                true
+            )
+            return
+        }
+
+        let address = this.args.at(1)
+        if (!address) {
+            log.error("missing required parameter \"deviceAddress\"")
+            this.notify(
+                "Could not pair the selected device: no address was provided",
+                {withTitle: "Blueman", subtitle: "Invalid arguments"},
+                true
+            )
+            return
+        }
+
+        let device = mgr.getDeviceByAddress(address)
+        if (device === null) {
+            log.error(`could not resolve a device at "${address}"`)
+            this.notify(
+                `Could not find a Bluetooth device at ${address}`,
+                {withTitle: "Blueman", subtitle: "Device not found"},
+                true
+            )
+            return
+        }
+
+        let cache = new PairScanCache(PairScanCache.getDirectory())
+        let cached = cache.find(device.addressKey)
+        let name = device.name || (cached && cached.name) || device.address
+
+        // The list might be stale: pair only when the device is not paired yet
+        if (mgr.getPairedAddressKeys()[device.addressKey] === true) {
+            log.debug(`"${name}" is already paired, connecting instead`)
+            if (this.connect(mgr, device)) {
+                this.notify(
+                    `Connected to ${name}`,
+                    {withTitle: "Blueman", subtitle: "Already paired"}
+                )
+            } else {
+                this.notify(
+                    `${name} is already paired, but the connection did not come up. Use btl to connect it.`,
+                    {withTitle: "Blueman", subtitle: "Error connecting"},
+                    true
+                )
+            }
+            return
+        }
+
+        log.debug(`pairing with "${name}" (${address})`)
+        let outcome = mgr.pairDevice(device, {
+            "onConfirm": value => this.confirmNumericValue(name, value),
+            "onPasskey": value => this.showPasskey(name, value),
+        })
+
+        if (outcome.status === "pin-required") {
+            log.error(`"${name}" requires a legacy PIN code`)
+            this.notify(
+                `${name} requires a PIN code. Pair it in System Settings -> Bluetooth instead.`,
+                {withTitle: "Blueman", subtitle: "PIN code required"},
+                true
+            )
+            return
+        }
+
+        if (outcome.status === "timeout") {
+            log.error(`pairing with "${name}" timed out`)
+            this.notify(
+                `Pairing with ${name} timed out. Make sure the device is turned on and in pairing mode.`,
+                {withTitle: "Blueman", subtitle: "Pairing timed out"},
+                true
+            )
+            return
+        }
+
+        if (outcome.status !== "ok") {
+            let reason = pairingErrorDescription(outcome.error)
+            log.error(`could not pair "${name}": ${reason}`)
+            this.notify(
+                `Could not pair ${name}: ${reason}`,
+                {withTitle: "Blueman", subtitle: "Error pairing"},
+                true
+            )
+            return
+        }
+
+        log.debug(`paired with "${name}"`)
+        cache.remove(device.addressKey)
+
+        // Pairing a new device is almost always done to use it right away
+        if (this.connect(mgr, device)) {
+            log.debug(`connected to "${name}" after pairing`)
+            this.notify(
+                `Paired and connected to ${name}`,
+                {withTitle: "Blueman", subtitle: "Paired"}
+            )
+            return
+        }
+
+        log.debug(`paired with "${name}", but the connection did not come up yet`)
+        this.notify(
+            `Paired ${name}. The connection is not up yet — try btl if the device does not connect by itself.`,
+            {withTitle: "Blueman", subtitle: "Paired"}
+        )
+    }
+
+    connect(mgr, device) {
+        try {
+            mgr.connectDevice(device)
+        } catch (e) {
+            log.error(`could not initiate the connection: ${e}`)
+            return false
+        }
+        return waitFor(
+            () => ObjC.unwrap(device.instance.isConnected),
+            PAIR_CONNECT_TIMEOUT_SECONDS
+        )
+    }
+
+    // Numeric comparison: the same six-digit code has to be shown on the device
+    // and confirmed here. Returning false cancels the pairing.
+    confirmNumericValue(name, numericValue) {
+        let code = String(numericValue).padStart(6, "0")
+        try {
+            let response = this.currentApp.displayDialog(
+                `Does ${name} display the code ${code}?`,
+                {
+                    withTitle: "Blueman",
+                    buttons: ["Cancel", "Codes match"],
+                    defaultButton: "Codes match",
+                    cancelButton: "Cancel",
+                    givingUpAfter: 30,
+                }
+            )
+            if (response.gaveUp === true) {
+                return false
+            }
+            return response.buttonReturned === "Codes match"
+        } catch (e) {
+            // Clicking Cancel raises -128 instead of returning a button name
+            if (!e || e.errorNumber !== -128) {
+                log.error(`could not ask for pairing confirmation: ${e}`)
+            }
+            return false
+        }
+    }
+
+    // Passkey entry: the code is typed on the device, so it only has to be
+    // visible on the Mac
+    showPasskey(name, passkey) {
+        let code = String(passkey).padStart(6, "0")
+        try {
+            this.currentApp.displayDialog(
+                `Enter the code ${code} on ${name}.`,
+                {
+                    withTitle: "Blueman",
+                    buttons: ["OK"],
+                    defaultButton: "OK",
+                    givingUpAfter: 60,
+                }
+            )
+        } catch (e) {
+            log.error(`could not show the pairing passkey: ${e}`)
+        }
+    }
+}
+
+// `btpair` action for the "Scan again" row: drops the cached scan and reopens
+// the list so that a new inquiry starts immediately.
+class PairRescanCommand extends WorkflowBase {
+    run() {
+        log.debug("clearing the cached pairing scan and reopening the list")
+        new PairScanCache(PairScanCache.getDirectory()).clear()
+
+        let keyword = this.config.pairKeyword || "btpair"
+        // Let Alfred finish closing the current list before reopening it
+        $.NSThread.sleepForTimeInterval(0.3)
+        try {
+            Application("com.runningwithcrayons.Alfred").search(keyword)
+        } catch (e) {
+            log.error(`could not reopen the pairing list: ${e}`)
+            this.notify(
+                `Press ${keyword} to scan again`,
+                {withTitle: "Blueman", subtitle: "Pair Bluetooth device"}
+            )
+        }
+    }
+}
+
 // Toggles the selected device in a "one device name per line" workflow
 // configuration variable (favorites or ignored devices). No Bluetooth
 // permission gate: these lists are pure configuration, and a name that no
@@ -1796,8 +2751,9 @@ class DiagnosticsCommand extends WorkflowBase {
             `Bluetooth permission: ${this.permissionLabel(info)}`,
             `Bluetooth power: ${this.powerLabel(info)}`,
             `Paired devices: ${this.deviceCountLabel(info)}`,
-            `Keywords: list=${this.config.listKeyword}, on=${this.config.onKeyword}, `
-                + `off=${this.config.offKeyword}, toggle=${this.config.toggleKeyword}`,
+            `Keywords: list=${this.config.listKeyword}, pair=${this.config.pairKeyword}, `
+                + `on=${this.config.onKeyword}, off=${this.config.offKeyword}, `
+                + `toggle=${this.config.toggleKeyword}`,
             `Settings: sort_order=${this.config.sortOrder || DEFAULT_SORT_ORDER}, `
                 + `show_mac_addresses=${this.config.showMacAddresses ? "on" : "off"}, `
                 + `ble_marker=${this.config.bleMarker ? "on" : "off"}, `
@@ -1835,6 +2791,9 @@ const possibleCommands = {
     "diagnostics": DiagnosticsCommand,
     "favorite": ToggleFavoriteCommand,
     "ignore": ToggleIgnoreCommand,
+    "pair": PairDeviceCommand,
+    "pair-list": PairListCommand,
+    "pair-rescan": PairRescanCommand,
     "toggle": ToggleConnectionCommand,
     "toggle-power": TogglePowerCommand,
     "turn-on": TurnBtOnCommand,

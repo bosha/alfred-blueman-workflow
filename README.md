@@ -7,6 +7,7 @@ This workflow enables you to manage your Bluetooth device connections and Blueto
 - Lists every paired Bluetooth device with a type-specific icon (keyboard, mouse, trackpad, headphones, speaker, phone, tablet, watch, game controller, computer) and dedicated icons for AirPods, Magic devices, the Logitech MX Master lineup and Keychron.
 - Shows connection state and battery levels, including separate AirPods left/right/case levels, and marks Bluetooth LE devices so it is clear which ones macOS will not let the workflow disconnect. Battery glyphs use [SF Symbols](https://developer.apple.com/sf-symbols/) when Apple's SF Pro font is installed, with an emoji fallback (configurable).
 - Connects and disconnects devices, and unpairs them behind a confirmation (experimental).
+- Pairs a new Bluetooth Classic device with `btpair` (experimental), prompting for the numeric code or passkey when the device requires one.
 - Stars favorites and hides ignored devices with modifier actions, stored in editable configuration fields.
 - Sorts by Alfred's learned order, favorites, connection state, alphabetically, or the macOS order.
 - Filters by device name, and by MAC address when addresses are shown; ignored devices reappear in search so they can be un-ignored.
@@ -68,6 +69,10 @@ To build a distributable bundle and cut a release (`make package` / `make releas
   - Hold `⌥` (Option) and press `⏎` to star a favorite.
   - Hold `⌘` (Command) and press `⏎` to ignore or unignore a device.
   - Hold `⌃` (Control) and press `⏎` to unpair a device (**experimental**).
+- **btpair**: Lists nearby unpaired Bluetooth Classic devices and pairs the selected one (experimental). The keyword is configurable.
+  - Type to filter by device name or address.
+  - One scan takes about eight seconds; choose **Scan again** to look for devices once more.
+  - Bluetooth LE devices are not listed — pair them in `System Settings -> Bluetooth`.
 - **bton**: Turns on Bluetooth on your device.
 - **btoff**: Turns off Bluetooth on your device.
 - **btt**: Toggles Bluetooth on or off.
@@ -129,6 +134,16 @@ This is a destructive, best-effort operation:
 - Because the call is asynchronous, the workflow verifies that the device actually disappeared from the paired list and reports an error when it did not.
 - Bluetooth LE devices (for example the Logitech MX Master 3S or Keychron K3 Max) may not support removal at all. If you cannot unpair a device from the list, use `System Settings -> Bluetooth -> device -> Forget This Device`.
 
+### Pairing new devices (experimental)
+
+Run `btpair` to list nearby devices that are not paired with this Mac yet, then press `⏎` on the one you want to pair. The workflow pairs the device and immediately tries to connect it.
+
+- Put the device into pairing mode first. Many devices only become discoverable for a short time after a button press (the Magic Trackpad, for example, stops advertising when it is left untouched), and are invisible to the scan otherwise. If nothing appears, power-cycle the device and scan again.
+- The scan looks for **Bluetooth Classic (BR/EDR)** devices for about eight seconds, which is what the workflow can pair. Bluetooth LE peripherals (for example the Keychron K3 Max, or devices shown as `HID BLE` in System Information) cannot be paired by third-party apps — pair them in `System Settings -> Bluetooth`.
+- Devices that use Secure Simple Pairing work transparently. When the system asks to confirm a six-digit code, the workflow shows the code and asks you to confirm that it matches the one on the device; when the device expects a passkey, the workflow displays the code to enter on the device. Devices that require a legacy PIN code are not supported — pair them in System Settings.
+- Success is verified against the system's paired list, and the connection is checked before the notification reports it. If the device does not connect immediately, use `btl` or wait for it to connect on its own.
+- The scan result is cached for a few seconds, so filtering the list stays instant. Pick **Scan again** to drop the cache and start a new scan.
+
 ### Favorites
 
 Hold `⌥` (Option) and press `⏎` on a device in the `btl` list to star or unstar it. Starred devices show a `⭐` next to their name; pick a favorites sorting option (see Settings) to bring them to the top.
@@ -145,9 +160,10 @@ A device that is both starred and ignored stays hidden (ignoring wins); if you r
 
 ## Settings
 
-The workflow exposes twelve configuration parameters in Alfred (Workflow -> Configure Workflow...):
+The workflow exposes thirteen configuration parameters in Alfred (Workflow -> Configure Workflow...):
 
 - **List keyword** — keyword used to open the device list (default `btl`).
+- **Pair keyword** — keyword used to pair a new Bluetooth device (default `btpair`).
 - **On keyword** — keyword used to turn Bluetooth on (default `bton`).
 - **Off keyword** — keyword used to turn Bluetooth off (default `btoff`).
 - **Toggle keyword** — keyword used to toggle Bluetooth on or off (default `btt`).

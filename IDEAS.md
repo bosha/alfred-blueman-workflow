@@ -83,6 +83,17 @@ One item per commit, ordered by value/effort. Check items off as they land.
   overrides live in `assets/icons/map.json`, keyed by vendor/product ID; connection
   state moved to the subtitle. Icons are generated with `tools/generate_icons.swift`.
 
+- [x] **Pair unpaired devices**
+  `btpair` runs one Classic inquiry, lists the unpaired devices it found and pairs
+  the selected one with `IOBluetoothDevicePair` (the same approach as
+  `blueutil --pair`), then connects it. Secure Simple Pairing confirmation and
+  passkey prompts are shown with `displayDialog`. Scan results are cached for a
+  few seconds because a Script Filter invocation cannot keep an inquiry alive and
+  restarting it on every keystroke never lets devices answer. Not supported:
+  Bluetooth LE peripherals (no public pairing API; CoreBluetooth exposes per-Mac
+  UUIDs, not addresses) and legacy PIN pairing (the reply needs a pointer to a
+  `BluetoothPINCode` struct, which JXA cannot build).
+
 - [x] **Unpair device**
   Modifier key + confirmation, using the private `remove` selector (same approach as
   blueutil). Destructive, so the UX needs care. Landed as `⌃⏎` on a `btl` item: routes
